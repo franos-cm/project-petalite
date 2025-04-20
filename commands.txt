@@ -1,0 +1,86 @@
+-- Starting litex
+mkdir project-petalite
+cd project-petalite
+python3 -m venv venv
+source venv/bin/activate
+mkdir litex
+cd litex
+wget https://raw.githubusercontent.com/enjoy-digital/litex/master/litex_setup.py
+chmod +x litex_setup.py
+python3 ./litex_setup.py --init --install --config=full
+
+cd ..
+pip3 install meson ninja
+sudo ./litex/litex_setup.py --gcc=riscv
+pip3 install litex/litex -- looks redundant but is necessary
+source /tools/Xilinx/Vivado/2024.2/settings64.sh
+
+
+
+-- Vivado
+sudo apt-get update
+sudo apt-get install locales
+sudo locale-gen en_US.UTF-8
+sudo update-locale
+source /tools/Xilinx/Vivado/2024.2/settings64.sh
+vivado&
+
+
+-- GTKWave
+sudo apt install build-essential meson gperf flex desktop-file-utils libgtk-3-dev libbz2-dev libjudy-dev libgirepository1.0-dev
+sudo apt install libgtk-4-dev
+git clone "https://github.com/gtkwave/gtkwave.git"
+cd gtkwave
+sudo meson setup build && cd build && meson install
+
+
+-- This is how you add .v files:
+# use the generated verilog file
+platform.add_source("bcd.v")
+
+-- To simulate an arbitrary SoC, you do:
+if __name__ == "__main__":
+    soc = MySoC()
+    builder = Builder(soc, output_dir="build")
+    builder.build(sim_config={"tool": "litex_sim"})  # Build with simulation configuration
+
+    # Run the simulation; you can also pass options like trace generation.
+    run_simulation(soc, vcd_name="my_soc.vcd")
+
+This hasnt been tested yet, and you probably need to make it interactive
+The lib itself does it like this, in the litex_sim.py file:
+
+builder = Builder(soc, **parser.builder_argdict)
+builder.build(
+    sim_config       = sim_config,
+    interactive      = not args.non_interactive,
+    video            = args.with_video_framebuffer or args.with_video_terminal or args.with_video_colorbars,
+    pre_run_callback = pre_run_callback,
+    **parser.toolchain_argdict,
+)
+
+
+-- To simulate, you need:
+1. A module at the SoC capable of communication (Etherbone)
+2. A client to bridge the simulation with your interaction (litex_client)
+3. A python script with whatever you want to simulate
+
+Example:
+1. litex_sim --with-etherbone --csr-csv=csr.csv
+2. litex_server --udp --udp-ip=192.168.1.50
+3. Script below:
+from litex import RemoteClient
+wb = RemoteClient()
+wb.open()
+# get identifier
+fpga_id = ""
+print("identifier_mem: ")
+for i in range(256):
+    c = chr(wb.read(wb.bases.identifier_mem + 4*i) & 0xff)
+    fpga_id += c
+    if c == "\0":
+        break
+print("fpga_id: " + fpga_id)
+wb.close()
+
+Default port is 192.168.1.50.
