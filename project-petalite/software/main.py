@@ -74,15 +74,15 @@ def main():
     )  # FIXME: Endianness.
 
     # Clean up unnecessary files (keep only .bin, .fbi, and linker.ld)
-    for filename in os.listdir(args.output_dir):
-        if not (
-            filename == firmware_bin
-            or filename == firmware_fbi
-            or filename == "linker.ld"
-        ):
-            filepath = os.path.join(args.output_dir, filename)
-            if os.path.isfile(filepath):
-                os.remove(filepath)
+    # for filename in os.listdir(args.output_dir):
+    #     if not (
+    #         filename == firmware_bin
+    #         or filename == firmware_fbi
+    #         or filename == "linker.ld"
+    #     ):
+    #         filepath = os.path.join(args.output_dir, filename)
+    #         if os.path.isfile(filepath):
+    #             os.remove(filepath)
 
 
 if __name__ == "__main__":

@@ -16,6 +16,92 @@ from litex.soc.integration.builder import Builder
 from litex.build.sim import SimPlatform
 from litex.build.sim.config import SimConfig
 
+import argparse
+import json
+
+
+def str_to_int(s):
+    try:
+        f = float(s)
+    except ValueError:
+        raise argparse.ArgumentTypeError(f"Value '{s}' is not a number.")
+
+    if not f.is_integer():
+        raise argparse.ArgumentTypeError(f"Value '{s}' is not an integer value.")
+
+    return int(f)
+
+
+def load_io_from_json(json_path):
+    def int_or_str(s):
+        try:
+            return int(s)
+        except ValueError:
+            return s
+
+    with open(json_path, "r") as f:
+        raw_io_data = json.load(f)
+
+    parsed_io_array = []
+    for raw_entry in raw_io_data:
+        parsed_entry = [raw_entry["name"], raw_entry["index"]]
+
+        if "subsignals" in raw_entry:
+            subsignals = [
+                Subsignal(name, Pins(int_or_str(signal["pins"])))
+                for name, signal in raw_entry["subsignals"].items()
+            ]
+            parsed_entry.extend(subsignals)
+
+        else:
+            parsed_entry.append(Pins(int_or_str(raw_entry["pins"])))
+
+        if raw_entry.get("iostandard"):
+            parsed_entry.append(IOStandard(raw_entry["iostandard"]))
+
+        parsed_io_array.append(tuple(parsed_entry))
+
+    return parsed_io_array
+
+
+def arg_parser():
+    parser = argparse.ArgumentParser(description="Project Petalite SoC")
+    parser.add_argument(
+        "--io-json",
+        type=str,
+        required=True,
+        help="Path to the io json config.",
+    )
+    parser.add_argument(
+        "--sys-clk-freq",
+        type=str_to_int,
+        default=1e6,
+        help="System clock frequency",
+    )
+    parser.add_argument(
+        "--build-dir",
+        type=str,
+        default="./build",
+        help="Path to the build dir.",
+    )
+    parser.add_argument(
+        "--only-build",
+        action="store_true",
+        default=False,
+        help="Only build the SoC without running the simulation.",
+    )
+    parser.add_argument(
+        "--firmware",
+        type=str,
+        help="Path to the firmware binary file. Required if --only_build is not set.",
+    )
+
+    args = parser.parse_args()
+    if not args.only_build and not args.firmware:
+        parser.error("--firmware is required when --only_build is not set.")
+
+    return args
+
 
 # Platforms -----------------------------------------------------------------------------------------
 class Platform(XilinxPlatform):
@@ -33,31 +119,40 @@ class SimulatedPlatform(SimPlatform):
         SimPlatform.__init__(self, "SIM", io)
 
 
-# Design -------------------------------------------------------------------------------------------
+# SoC Design -------------------------------------------------------------------------------------------
 class ProjectPetalite(SoCCore):
-    def __init__(self, platform: Platform, sys_clk_freq: int):
+    def __init__(
+        self,
+        platform: Platform,
+        sys_clk_freq: int,
+        integrated_rom_init: str = None,
+    ):
 
         # SoC with CPU
         SoCCore.__init__(
             self,
+            # System specs
             platform,
-            cpu_type="rocket",
-            cpu_variant="medium",
-            clk_freq=sys_clk_freq,
             ident="Project Petalite",
             ident_version=True,
-            # Uart seems necessary
+            # CPU specs
+            cpu_type="rocket",
+            cpu_variant="small",
+            clk_freq=sys_clk_freq,
+            # Communication with terminal
             with_uart=True,
             uart_name="sim",
-            # Why overwrite this?
+            # Memory specs
             integrated_rom_size=0x1_0000,
-            # TODO: cant use main_ram because of SBI...
-            # integrated_main_ram_size=0x1_0000,
+            integrated_rom_init=integrated_rom_init if integrated_rom_init else [],
+            # integrated_main_ram_size=0x1_0000, TODO: cant use main_ram because of SBI...
         )
 
         # Clock Reset Generation
         self.submodules.crg = CRG(
-            platform.request("sys_clk"), ~platform.request("cpu_reset")
+            platform.request("sys_clk"),
+            # TODO: the commented line breaks the simulation, check why
+            # ~platform.request("cpu_reset")
         )
 
         # FPGA identification
@@ -72,69 +167,42 @@ class ProjectPetalite(SoCCore):
         #     clock_pads=self.platform.request("eth_clocks"),
         #     pads=self.platform.request("eth"),
         # )
-        self.ethphy = LiteEthPHYModel(self.platform.request("eth", 0))
-        self.add_csr("ethphy")
+        # self.ethphy = LiteEthPHYModel(self.platform.request("eth", 0))
+        # self.add_csr("ethphy")
 
         # Connecting ethernet communication to Wishbone bus
-        self.add_etherbone(
-            phy=self.ethphy,
-            # Etherbone params
-            ip_address="192.168.1.50",
-            mac_address=0x10E2D5000001,
-            # Ethernet MAC params...
-            # TODO: change this if full networking is needed
-            with_ethmac=False,
-        )
+        # self.add_etherbone(
+        #     phy=self.ethphy,
+        #     # Etherbone params
+        #     ip_address="192.168.1.50",
+        #     mac_address=0x10E2D5000001,
+        #     # Ethernet MAC params...
+        #     # TODO: change this if full networking is needed
+        #     with_ethmac=False,
+        # )
 
 
 def main():
-    # TODO: Change IO in future according to board... maybe even use jsons to parametrize
-    _io = [
-        ("sys_clk", 0, Pins("E3"), IOStandard("LVCMOS33")),
-        ("cpu_reset", 0, Pins("C12"), IOStandard("LVCMOS33")),
-        # Ethernet (Stream Endpoint).
-        (
-            "eth_clocks",
-            0,
-            Subsignal("tx", Pins(1)),
-            Subsignal("rx", Pins(1)),
-        ),
-        (
-            "eth",
-            0,
-            Subsignal("source_valid", Pins(1)),
-            Subsignal("source_ready", Pins(1)),
-            Subsignal("source_data", Pins(8)),
-            Subsignal("sink_valid", Pins(1)),
-            Subsignal("sink_ready", Pins(1)),
-            Subsignal("sink_data", Pins(8)),
-        ),
-        # Serial.
-        (
-            "serial",
-            0,
-            Subsignal("source_valid", Pins(1)),
-            Subsignal("source_ready", Pins(1)),
-            Subsignal("source_data", Pins(8)),
-            Subsignal("sink_valid", Pins(1)),
-            Subsignal("sink_ready", Pins(1)),
-            Subsignal("sink_data", Pins(8)),
-        ),
-    ]
+    args = arg_parser()
 
-    sys_clk_freq = int(100e6)
+    io = load_io_from_json(args.io_json)
+    sys_clk_freq = int(args.sys_clk_freq)
 
-    # Instantiate the platform and SoC
-    platform = SimulatedPlatform(_io)
-    soc = ProjectPetalite(platform=platform, sys_clk_freq=sys_clk_freq)
-
-    # Build the SoC
-    builder = Builder(soc, output_dir="build", compile_gateware=False)
+    platform = SimulatedPlatform(io)
+    soc = ProjectPetalite(
+        platform=platform,
+        sys_clk_freq=sys_clk_freq,
+        integrated_rom_init=args.firmware,
+    )
 
     sim_config = SimConfig()
+    sim_config.add_module("serial2console", "serial")
     sim_config.add_clocker("sys_clk", freq_hz=sys_clk_freq)
 
-    builder.build(run=False, sim_config=sim_config)
+    builder = Builder(
+        soc, output_dir=args.build_dir, compile_gateware=(not args.only_build)
+    )
+    builder.build(run=(not args.only_build), sim_config=sim_config)
 
 
 if __name__ == "__main__":
