@@ -38,7 +38,7 @@ def main():
     os.makedirs(args.output_dir, exist_ok=True)
 
     # Copy contents to output directory
-    os.system(f"cp {os.path.abspath(os.path.dirname(__file__))}/* {args.output_dir}")
+    os.system(f"cp {os.path.abspath(os.path.dirname(__file__))}/* {args.output_dir} -r")
     os.system(
         f"chmod -R u+w {args.output_dir}"
     )  # Nix specific: Allow linker script to be modified.

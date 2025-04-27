@@ -1,19 +1,17 @@
 BUILD_DIR?=../build/
-OBJECTS   = main.o crt0.o
-
+C_FILES := $(wildcard demo/*.c)
+OBJECTS := $(C_FILES:.c=.o)
+OBJECTS += crt0.o
 
 include $(BUILD_DIR)/software/include/generated/variables.mak
 include $(SOC_DIRECTORY)/software/common.mak
 
-
 ifdef WITH_CXX
-	OBJECTS += hellocpp.o
 	CFLAGS += -DWITH_CXX
 endif
 
 
 all: $(FIRMWARE_NAME).bin
-
 
 %.bin: %.elf
 	$(OBJCOPY) -O binary $< $@
@@ -38,8 +36,6 @@ endif
 
 # pull in dependency info for *existing* .o files
 -include $(OBJECTS:.o=.d)
-
-donut.o: CFLAGS   += -w
 
 VPATH = $(BIOS_DIRECTORY):$(BIOS_DIRECTORY)/cmds:$(CPU_DIRECTORY)
 

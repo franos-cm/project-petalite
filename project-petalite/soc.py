@@ -4,17 +4,18 @@
 
 from migen.genlib.io import CRG
 
-from litex.build.xilinx import XilinxPlatform
-from litex.build.generic_platform import IOStandard, Pins, Subsignal
 
 from litex.soc.cores import dna
-from liteeth.phy.rmii import LiteEthPHYRMII
-from liteeth.phy.model import LiteEthPHYModel
-
 from litex.soc.integration.soc_core import SoCCore
 from litex.soc.integration.builder import Builder
 from litex.build.sim import SimPlatform
 from litex.build.sim.config import SimConfig
+from litex.build.xilinx import XilinxPlatform
+from litex.build.generic_platform import IOStandard, Pins, Subsignal
+
+from liteeth.phy.rmii import LiteEthPHYRMII
+from liteeth.phy.model import LiteEthPHYModel
+from liteeth.common import convert_ip
 
 import argparse
 import json
@@ -95,10 +96,24 @@ def arg_parser():
         type=str,
         help="Path to the firmware binary file. Required if --only_build is not set.",
     )
+    parser.add_argument(
+        "--local-ip",
+        type=str,
+        default="192.168.1.50",
+        help="Local ip for ethernet",
+    )
+    parser.add_argument(
+        "--remote-ip",
+        type=str,
+        default="192.168.1.100",
+        help="Remote ip for ethernet",
+    )
 
     args = parser.parse_args()
     if not args.only_build and not args.firmware:
         parser.error("--firmware is required when --only_build is not set.")
+    if args.only_build and args.firmware:
+        parser.error("--firmware is ignored when --only_build is set.")
 
     return args
 
@@ -122,6 +137,9 @@ class ProjectPetalite(SoCCore):
         self,
         platform: Platform,
         sys_clk_freq: int,
+        # Necessary for Ethernet... delete if comm changes
+        local_ip: int,
+        remote_ip: int,
         integrated_rom_init: str = None,
     ):
 
@@ -148,7 +166,7 @@ class ProjectPetalite(SoCCore):
         # Clock Reset Generation
         self.submodules.crg = CRG(
             platform.request("sys_clk"),
-            # TODO: the commented line breaks the simulation, check why
+            # TODO: necessary when targeting real board
             # ~platform.request("cpu_reset")
         )
 
@@ -158,25 +176,26 @@ class ProjectPetalite(SoCCore):
             self.add_csr("dna")
 
         # Ethernet Physical Core.
-        # Decide which core to use according to board
-        # TODO: stop simulating
-        # self.submodules.ethphy = LiteEthPHYRMII(
+        # TODO: stop simulating, and use core according to board
+        # self.ethphy = LiteEthPHYRMII(
         #     clock_pads=self.platform.request("eth_clocks"),
         #     pads=self.platform.request("eth"),
         # )
-        # self.ethphy = LiteEthPHYModel(self.platform.request("eth", 0))
-        # self.add_csr("ethphy")
+        self.submodules.ethphy = LiteEthPHYModel(self.platform.request("eth", 0))
+        self.add_csr("ethphy")
 
         # Connecting ethernet communication to Wishbone bus
-        # self.add_etherbone(
-        #     phy=self.ethphy,
-        #     # Etherbone params
-        #     ip_address="192.168.1.50",
-        #     mac_address=0x10E2D5000001,
-        #     # Ethernet MAC params...
-        #     # TODO: change this if full networking is needed
-        #     with_ethmac=False,
-        # )
+        self.add_etherbone(
+            phy=self.ethphy,
+            # Ethernet physical params
+            ip_address=convert_ip(local_ip) + 1,
+            mac_address=0x10E2D5000001,
+            # Ethernet MAC params
+            with_ethmac=True,
+            ethmac_address=0x10E2D5000000,
+            ethmac_local_ip=local_ip,
+            ethmac_remote_ip=remote_ip,
+        )
 
 
 def main():
@@ -189,12 +208,17 @@ def main():
     soc = ProjectPetalite(
         platform=platform,
         sys_clk_freq=sys_clk_freq,
+        local_ip=args.local_ip,
+        remote_ip=args.remote_ip,
         integrated_rom_init=args.firmware,
     )
 
     sim_config = SimConfig()
     sim_config.add_module("serial2console", "serial")
     sim_config.add_clocker("sys_clk", freq_hz=sys_clk_freq)
+    sim_config.add_module(
+        "ethernet", "eth", args={"interface": "tap0", "ip": args.remote_ip}
+    )
 
     builder = Builder(
         soc, output_dir=args.build_dir, compile_gateware=(not args.only_build)
