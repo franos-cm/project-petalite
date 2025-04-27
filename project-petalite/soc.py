@@ -106,15 +106,12 @@ def arg_parser():
 # Platforms -----------------------------------------------------------------------------------------
 class Platform(XilinxPlatform):
     default_clk_name = "sys_clk"
-    # default_clk_period = 1e9 / 100e6
 
     def __init__(self, io):
         XilinxPlatform.__init__(self, "xc7a100t-csg324-1", io, toolchain="vivado")
 
 
 class SimulatedPlatform(SimPlatform):
-    default_clk_name = "sys_clk"
-
     def __init__(self, io):
         SimPlatform.__init__(self, "SIM", io)
 
@@ -202,7 +199,13 @@ def main():
     builder = Builder(
         soc, output_dir=args.build_dir, compile_gateware=(not args.only_build)
     )
-    builder.build(run=(not args.only_build), sim_config=sim_config)
+
+    # TODO: sim is considerably slower than an equal configuration on litex_sim... investigate why
+    builder.build(
+        run=(not args.only_build),
+        sim_config=sim_config,
+        interactive=False,
+    )
 
 
 if __name__ == "__main__":

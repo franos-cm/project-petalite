@@ -1,5 +1,5 @@
 BUILD_DIR?=../build/
-OBJECTS   = main.o
+OBJECTS   = main.o crt0.o
 
 
 include $(BUILD_DIR)/software/include/generated/variables.mak
