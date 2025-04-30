@@ -6,15 +6,16 @@ from migen.genlib.io import CRG
 
 
 from litex.soc.cores import dna
-from litex.soc.integration.soc_core import SoCCore
 from litex.soc.integration.builder import Builder
+from litex.soc.integration.soc_core import SoCCore, SoCRegion
+
 from litex.build.sim import SimPlatform
 from litex.build.sim.config import SimConfig
 from litex.build.xilinx import XilinxPlatform
 from litex.build.generic_platform import IOStandard, Pins, Subsignal
 
-from liteeth.phy.rmii import LiteEthPHYRMII
 from liteeth.phy.model import LiteEthPHYModel
+from liteeth.mac import LiteEthMAC
 from liteeth.common import convert_ip
 
 import argparse
@@ -108,6 +109,12 @@ def arg_parser():
         default="192.168.1.100",
         help="Remote ip for ethernet",
     )
+    parser.add_argument(
+        "--comm",
+        type=str,
+        default="ethernet",
+        help="Communication protocol",
+    )
 
     args = parser.parse_args()
     if not args.only_build and not args.firmware:
@@ -138,6 +145,7 @@ class ProjectPetalite(SoCCore):
         platform: Platform,
         sys_clk_freq: int,
         # Necessary for Ethernet... delete if comm changes
+        comm_protocol: str,
         local_ip: int,
         remote_ip: int,
         integrated_rom_init: str = None,
@@ -155,8 +163,7 @@ class ProjectPetalite(SoCCore):
             cpu_variant="small",
             clk_freq=sys_clk_freq,
             # Communication with terminal
-            with_uart=True,
-            uart_name="sim",
+            with_uart=False,
             # Memory specs
             integrated_rom_size=0x1_0000,
             integrated_rom_init=integrated_rom_init if integrated_rom_init else [],
@@ -181,21 +188,89 @@ class ProjectPetalite(SoCCore):
         #     clock_pads=self.platform.request("eth_clocks"),
         #     pads=self.platform.request("eth"),
         # )
-        self.submodules.ethphy = LiteEthPHYModel(self.platform.request("eth", 0))
-        self.add_csr("ethphy")
+
+        if comm_protocol == "uart":
+            self.add_uart(uart_name="sim")
+
+        elif comm_protocol == "ethernet":
+            # Ethernet physical layer
+            self.ethphy = LiteEthPHYModel(self.platform.request("eth", 0))
+
+            # Ethernet data link layer
+            self.ethmac = LiteEthMAC(
+                phy=self.ethphy,
+                dw=32,  # TODO: change this depending on physical layer
+                interface="wishbone",
+                endianness=self.cpu.endianness,
+            )
+
+            # Calculate memory region sizes
+            ethmac_rx_region_size = (
+                self.ethmac.rx_slots.constant * self.ethmac.slot_size.constant
+            )
+            ethmac_tx_region_size = (
+                self.ethmac.tx_slots.constant * self.ethmac.slot_size.constant
+            )
+            ethmac_region_size = ethmac_rx_region_size + ethmac_tx_region_size
+
+            # Add region for TX+RX
+            self.bus.add_region(
+                "ethmac",
+                SoCRegion(
+                    origin=self.mem_map.get("ethmac", None),
+                    size=ethmac_region_size,
+                    linker=True,
+                    cached=False,
+                ),
+            )
+            # Add region for RX, define slave interface
+            ethmac_rx_region = SoCRegion(
+                origin=self.bus.regions["ethmac"].origin + 0,
+                size=ethmac_rx_region_size,
+                linker=True,
+                cached=False,
+            )
+            self.bus.add_slave(
+                name="ethmac_rx", slave=self.ethmac.bus_rx, region=ethmac_rx_region
+            )
+
+            # Add region for TX, define slave interface
+            ethmac_tx_region = SoCRegion(
+                origin=self.bus.regions["ethmac"].origin + ethmac_rx_region_size,
+                size=ethmac_tx_region_size,
+                linker=True,
+                cached=False,
+            )
+            self.bus.add_slave(
+                name="ethmac_tx", slave=self.ethmac.bus_tx, region=ethmac_tx_region
+            )
+
+            # Add IRQs (if enabled). #TODO: check why
+            if self.irq.enabled:
+                self.irq.add("ethmac", use_loc_if_exists=True)
+
+            # TODO: I dont get why this is necessary, check later
+            for i in range(4):
+                self.add_constant(
+                    "LOCALIP{}".format(i + 1), int(local_ip.split(".")[i])
+                )
+            for i in range(4):
+                self.add_constant(
+                    "REMOTEIP{}".format(i + 1), int(remote_ip.split(".")[i])
+                )
 
         # Connecting ethernet communication to Wishbone bus
-        self.add_etherbone(
-            phy=self.ethphy,
-            # Ethernet physical params
-            ip_address=convert_ip(local_ip) + 1,
-            mac_address=0x10E2D5000001,
-            # Ethernet MAC params
-            with_ethmac=True,
-            ethmac_address=0x10E2D5000000,
-            ethmac_local_ip=local_ip,
-            ethmac_remote_ip=remote_ip,
-        )
+        # self.add_etherbone(
+        #     phy=self.ethphy,
+        #     # Ethernet physical params
+        #     ip_address=convert_ip(local_ip) + 1,
+        #     mac_address=0x10E2D5000001,
+        #     # Ethernet MAC params
+        #     with_ethmac=True,
+        #     ethmac_address=0x10E2D5000000,
+        #     ethmac_local_ip=local_ip,
+        #     ethmac_remote_ip=remote_ip,
+        # )
 
 
 def main():
@@ -208,17 +283,21 @@ def main():
     soc = ProjectPetalite(
         platform=platform,
         sys_clk_freq=sys_clk_freq,
+        comm_protocol=args.comm,
         local_ip=args.local_ip,
         remote_ip=args.remote_ip,
         integrated_rom_init=args.firmware,
     )
 
     sim_config = SimConfig()
-    sim_config.add_module("serial2console", "serial")
     sim_config.add_clocker("sys_clk", freq_hz=sys_clk_freq)
-    sim_config.add_module(
-        "ethernet", "eth", args={"interface": "tap0", "ip": args.remote_ip}
-    )
+
+    if args.comm == "uart":
+        sim_config.add_module("serial2console", "serial")
+    elif args.comm == "ethernet":
+        sim_config.add_module(
+            "ethernet", "eth", args={"interface": "tap0", "ip": args.remote_ip}
+        )
 
     builder = Builder(
         soc, output_dir=args.build_dir, compile_gateware=(not args.only_build)

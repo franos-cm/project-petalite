@@ -87,6 +87,6 @@ Default port is 192.168.1.50.
 
 
 # Commands
-./project-petalite/soc.py --only-build --io-json=./project-petalite/io_config.json --sys-clk-freq=1e6
+./project-petalite/soc.py --only-build --io-json=./project-petalite/io_sim.json --sys-clk-freq=1e6
 ./project-petalite/software/main.py --build-path=./build --mem=rom
 ./project-petalite/soc.py --firmware=firmware/firmware.bin --io-json=./project-petalite/io_config.json --sys-clk-freq=1e6
