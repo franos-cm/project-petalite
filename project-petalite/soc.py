@@ -1,25 +1,24 @@
 #!/usr/bin/env python3
 
-# from migen import *
-
+from migen import Instance
 from migen.genlib.io import CRG
 
-
 from litex.soc.cores import dna
+from litex.soc.cores.dma import WishboneDMAReader, WishboneDMAWriter
 from litex.soc.integration.builder import Builder
-from litex.soc.integration.soc_core import SoCCore, SoCRegion
+from litex.soc.integration.soc_core import SoCCore
+from litex.soc.interconnect.csr import CSR, CSRStorage
 
 from litex.build.sim import SimPlatform
 from litex.build.sim.config import SimConfig
 from litex.build.xilinx import XilinxPlatform
 from litex.build.generic_platform import IOStandard, Pins, Subsignal
 
-from liteeth.phy.model import LiteEthPHYModel
-from liteeth.mac import LiteEthMAC
-from liteeth.common import convert_ip
-
 import argparse
 import json
+
+from .dilithium import Dilithium
+from .stream_bridge import CSRStreamBridge
 
 
 def str_to_int(s):
@@ -98,22 +97,16 @@ def arg_parser():
         help="Path to the firmware binary file. Required if --only_build is not set.",
     )
     parser.add_argument(
-        "--local-ip",
-        type=str,
-        default="192.168.1.50",
-        help="Local ip for ethernet",
-    )
-    parser.add_argument(
-        "--remote-ip",
-        type=str,
-        default="192.168.1.100",
-        help="Remote ip for ethernet",
-    )
-    parser.add_argument(
         "--comm",
         type=str,
-        default="ethernet",
+        default="uart",
         help="Communication protocol",
+    )
+    parser.add_argument(
+        "--rtl_dir_path",
+        type=str,
+        default="./dilithium/rtl_src",
+        help="Directory path for custom cores",
     )
 
     args = parser.parse_args()
@@ -137,6 +130,9 @@ class SimulatedPlatform(SimPlatform):
     def __init__(self, io):
         SimPlatform.__init__(self, "SIM", io)
 
+    def add_rtl_sources(self, path: str):
+        self.add_source_dir(path=path)
+
 
 # SoC Design -------------------------------------------------------------------------------------------
 class ProjectPetalite(SoCCore):
@@ -146,8 +142,6 @@ class ProjectPetalite(SoCCore):
         sys_clk_freq: int,
         # Necessary for Ethernet... delete if comm changes
         comm_protocol: str,
-        local_ip: int,
-        remote_ip: int,
         integrated_rom_init: str = None,
     ):
 
@@ -182,95 +176,31 @@ class ProjectPetalite(SoCCore):
             self.submodules.dna = dna.DNA()
             self.add_csr("dna")
 
-        # Ethernet Physical Core.
-        # TODO: stop simulating, and use core according to board
-        # self.ethphy = LiteEthPHYRMII(
-        #     clock_pads=self.platform.request("eth_clocks"),
-        #     pads=self.platform.request("eth"),
-        # )
+        self.add_comm_capability(comm_protocol=comm_protocol)
+        self.add_dilithium()
 
+    def add_comm_capability(self: SoCCore, comm_protocol: str):
         if comm_protocol == "uart":
             self.add_uart(uart_name="sim")
 
-        elif comm_protocol == "ethernet":
-            # Ethernet physical layer
-            self.ethphy = LiteEthPHYModel(self.platform.request("eth", 0))
+        elif comm_protocol == "pcie":
+            pass
 
-            # Ethernet data link layer
-            self.ethmac = LiteEthMAC(
-                phy=self.ethphy,
-                dw=32,  # TODO: change this depending on physical layer
-                interface="wishbone",
-                endianness=self.cpu.endianness,
-            )
+    def add_dilithium(self: SoCCore):
+        # For now, Dilithium without DMA
+        self.submodules.stream_bridge = CSRStreamBridge(data_width=64)
+        self.submodules.dilithium = Dilithium()
 
-            # Calculate memory region sizes
-            ethmac_rx_region_size = (
-                self.ethmac.rx_slots.constant * self.ethmac.slot_size.constant
-            )
-            ethmac_tx_region_size = (
-                self.ethmac.tx_slots.constant * self.ethmac.slot_size.constant
-            )
-            ethmac_region_size = ethmac_rx_region_size + ethmac_tx_region_size
+        self.start = CSRStorage(1)
+        self.mode = CSRStorage(2)
+        self.sec_lvl = CSRStorage(3)
 
-            # Add region for TX+RX
-            self.bus.add_region(
-                "ethmac",
-                SoCRegion(
-                    origin=self.mem_map.get("ethmac", None),
-                    size=ethmac_region_size,
-                    linker=True,
-                    cached=False,
-                ),
-            )
-            # Add region for RX, define slave interface
-            ethmac_rx_region = SoCRegion(
-                origin=self.bus.regions["ethmac"].origin + 0,
-                size=ethmac_rx_region_size,
-                linker=True,
-                cached=False,
-            )
-            self.bus.add_slave(
-                name="ethmac_rx", slave=self.ethmac.bus_rx, region=ethmac_rx_region
-            )
-
-            # Add region for TX, define slave interface
-            ethmac_tx_region = SoCRegion(
-                origin=self.bus.regions["ethmac"].origin + ethmac_rx_region_size,
-                size=ethmac_tx_region_size,
-                linker=True,
-                cached=False,
-            )
-            self.bus.add_slave(
-                name="ethmac_tx", slave=self.ethmac.bus_tx, region=ethmac_tx_region
-            )
-
-            # Add IRQs (if enabled). #TODO: check why
-            if self.irq.enabled:
-                self.irq.add("ethmac", use_loc_if_exists=True)
-
-            # TODO: I dont get why this is necessary, check later
-            for i in range(4):
-                self.add_constant(
-                    "LOCALIP{}".format(i + 1), int(local_ip.split(".")[i])
-                )
-            for i in range(4):
-                self.add_constant(
-                    "REMOTEIP{}".format(i + 1), int(remote_ip.split(".")[i])
-                )
-
-        # Connecting ethernet communication to Wishbone bus
-        # self.add_etherbone(
-        #     phy=self.ethphy,
-        #     # Ethernet physical params
-        #     ip_address=convert_ip(local_ip) + 1,
-        #     mac_address=0x10E2D5000001,
-        #     # Ethernet MAC params
-        #     with_ethmac=True,
-        #     ethmac_address=0x10E2D5000000,
-        #     ethmac_local_ip=local_ip,
-        #     ethmac_remote_ip=remote_ip,
-        # )
+        self.comb += [self.stream_bridge.source.connect(self.dilithium.sink)]
+        self.comb += [
+            self.dilithium.start.eq(self.start.storage),
+            self.dilithium.mode.eq(self.mode.storage),
+            self.dilithium.sec_lvl.eq(self.sec_lvl.storage),
+        ]
 
 
 def main():
@@ -280,12 +210,12 @@ def main():
     sys_clk_freq = int(args.sys_clk_freq)
 
     platform = SimulatedPlatform(io)
+    platform.add_rtl_sources(path=args.rtl_dir_path)
+
     soc = ProjectPetalite(
         platform=platform,
         sys_clk_freq=sys_clk_freq,
         comm_protocol=args.comm,
-        local_ip=args.local_ip,
-        remote_ip=args.remote_ip,
         integrated_rom_init=args.firmware,
     )
 

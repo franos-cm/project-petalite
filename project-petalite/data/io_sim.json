@@ -1,0 +1,24 @@
+[
+    {
+        "name": "sys_clk",
+        "index": 0,
+        "pins": "1"
+    },
+    {
+        "name": "cpu_reset",
+        "index": 0,
+        "pins": "1"
+    },
+    {
+        "name": "serial",
+        "index": 0,
+        "subsignals": {
+            "source_valid": { "pins": "1" },
+            "source_ready": { "pins": "1" },
+            "source_data": { "pins": "8" },
+            "sink_valid": { "pins": "1" },
+            "sink_ready": { "pins": "1" },
+            "sink_data": { "pins": "8" }
+        }
+    }
+]
