@@ -1,146 +1,74 @@
 #!/usr/bin/env python3
-
-from migen import Instance
+from migen import ClockDomain, Signal, ClockSignal, ResetSignal
 from migen.genlib.io import CRG
 
 from litex.soc.cores import dna
-from litex.soc.cores.dma import WishboneDMAReader, WishboneDMAWriter
+from litex.soc.cores.led import LedChaser
+from litex.soc.cores.clock import S7PLL, S7IDELAYCTRL
 from litex.soc.integration.builder import Builder
 from litex.soc.integration.soc_core import SoCCore
-from litex.soc.interconnect.csr import CSR, CSRStorage
+from litex.soc.integration.soc import LiteXModule
+from litex.soc.interconnect.csr import CSRStorage
+
+from litedram.phy import s7ddrphy
+from litedram.modules import MT41K128M16
+from liteeth.phy.mii import LiteEthPHYMII
 
 from litex.build.sim import SimPlatform
 from litex.build.sim.config import SimConfig
-from litex.build.xilinx import XilinxPlatform
-from litex.build.generic_platform import IOStandard, Pins, Subsignal
+from litex.build.generic_platform import GenericPlatform
+from litex_boards.platforms import digilent_zybo_z7, digilent_arty
 
-import argparse
-import json
-
-from .dilithium import Dilithium
-from .stream_bridge import CSRStreamBridge
-
-
-def str_to_int(s):
-    try:
-        f = float(s)
-    except ValueError:
-        raise argparse.ArgumentTypeError(f"Value '{s}' is not a number.")
-
-    if not f.is_integer():
-        raise argparse.ArgumentTypeError(f"Value '{s}' is not an integer value.")
-
-    return int(f)
-
-
-def load_io_from_json(json_path):
-    def int_or_str(s):
-        try:
-            return int(s)
-        except ValueError:
-            return s
-
-    with open(json_path, "r") as f:
-        raw_io_data = json.load(f)
-
-    parsed_io_array = []
-    for raw_entry in raw_io_data:
-        parsed_entry = [raw_entry["name"], raw_entry["index"]]
-
-        if "subsignals" in raw_entry:
-            subsignals = [
-                Subsignal(name, Pins(int_or_str(signal["pins"])))
-                for name, signal in raw_entry["subsignals"].items()
-            ]
-            parsed_entry.extend(subsignals)
-
-        else:
-            parsed_entry.append(Pins(int_or_str(raw_entry["pins"])))
-
-        if raw_entry.get("iostandard"):
-            parsed_entry.append(IOStandard(raw_entry["iostandard"]))
-
-        parsed_io_array.append(tuple(parsed_entry))
-
-    return parsed_io_array
-
-
-def arg_parser():
-    parser = argparse.ArgumentParser(description="Project Petalite SoC")
-    parser.add_argument(
-        "--io-json",
-        type=str,
-        required=True,
-        help="Path to the io json config.",
-    )
-    parser.add_argument(
-        "--sys-clk-freq",
-        type=str_to_int,
-        default=1e6,
-        help="System clock frequency",
-    )
-    parser.add_argument(
-        "--build-dir",
-        type=str,
-        default="./build",
-        help="Path to the build dir.",
-    )
-    parser.add_argument(
-        "--only-build",
-        action="store_true",
-        default=False,
-        help="Only build the SoC without running the simulation.",
-    )
-    parser.add_argument(
-        "--firmware",
-        type=str,
-        help="Path to the firmware binary file. Required if --only_build is not set.",
-    )
-    parser.add_argument(
-        "--comm",
-        type=str,
-        default="uart",
-        help="Communication protocol",
-    )
-    parser.add_argument(
-        "--rtl_dir_path",
-        type=str,
-        default="./dilithium/rtl_src",
-        help="Directory path for custom cores",
-    )
-
-    args = parser.parse_args()
-    if not args.only_build and not args.firmware:
-        parser.error("--firmware is required when --only_build is not set.")
-    if args.only_build and args.firmware:
-        parser.error("--firmware is ignored when --only_build is set.")
-
-    return args
-
-
-# Platforms -----------------------------------------------------------------------------------------
-class Platform(XilinxPlatform):
-    default_clk_name = "sys_clk"
-
-    def __init__(self, io):
-        XilinxPlatform.__init__(self, "xc7a100t-csg324-1", io, toolchain="vivado")
-
-
-class SimulatedPlatform(SimPlatform):
-    def __init__(self, io):
-        SimPlatform.__init__(self, "SIM", io)
-
-    def add_rtl_sources(self, path: str):
-        self.add_source_dir(path=path)
+from dilithium import Dilithium
+from stream_bridge import CSRToStreamBridge, StreamToCSRBridge
+from platform import PetaliteSimPlatform
+from utils import arg_parser
 
 
 # SoC Design -------------------------------------------------------------------------------------------
+
+
+class _CRG(LiteXModule):
+    def __init__(self, platform, sys_clk_freq, with_dram=True, with_rst=True):
+        self.rst = Signal()
+        self.cd_sys = ClockDomain()
+        self.cd_eth = ClockDomain()
+        if with_dram:
+            self.cd_sys4x = ClockDomain()
+            self.cd_sys4x_dqs = ClockDomain()
+            self.cd_idelay = ClockDomain()
+
+        # # #
+
+        # Clk/Rst.
+        clk100 = platform.request("clk100")
+        rst = ~platform.request("cpu_reset") if with_rst else 0
+
+        # PLL.
+        self.pll = pll = S7PLL(speedgrade=-1)
+        self.comb += pll.reset.eq(rst | self.rst)
+        pll.register_clkin(clk100, 100e6)
+        pll.create_clkout(self.cd_sys, sys_clk_freq)
+        pll.create_clkout(self.cd_eth, 25e6)
+        self.comb += platform.request("eth_ref_clk").eq(self.cd_eth.clk)
+        platform.add_false_path_constraints(
+            self.cd_sys.clk, pll.clkin
+        )  # Ignore sys_clk to pll.clkin path created by SoC's rst.
+        if with_dram:
+            pll.create_clkout(self.cd_sys4x, 4 * sys_clk_freq)
+            pll.create_clkout(self.cd_sys4x_dqs, 4 * sys_clk_freq, phase=90)
+            pll.create_clkout(self.cd_idelay, 200e6)
+
+        # IdelayCtrl.
+        if with_dram:
+            self.idelayctrl = S7IDELAYCTRL(self.cd_idelay)
+
+
 class ProjectPetalite(SoCCore):
     def __init__(
         self,
-        platform: Platform,
+        platform: GenericPlatform,
         sys_clk_freq: int,
-        # Necessary for Ethernet... delete if comm changes
         comm_protocol: str,
         integrated_rom_init: str = None,
     ):
@@ -153,8 +81,10 @@ class ProjectPetalite(SoCCore):
             ident="Project Petalite",
             ident_version=True,
             # CPU specs
-            cpu_type="rocket",
-            cpu_variant="small",
+            cpu_type="picorv32",
+            cpu_variant="standard",
+            # cpu_type="rocket",
+            # cpu_variant="small",
             clk_freq=sys_clk_freq,
             # Communication with terminal
             with_uart=False,
@@ -163,82 +93,125 @@ class ProjectPetalite(SoCCore):
             integrated_rom_init=integrated_rom_init if integrated_rom_init else [],
             # integrated_main_ram_size=0x1_0000, TODO: cant use main_ram because of SBI...
         )
+        self.is_simulated = isinstance(platform, SimPlatform)
+        with_dram = self.integrated_main_ram_size == 0
 
-        # Clock Reset Generation
-        self.submodules.crg = CRG(
-            platform.request("sys_clk"),
-            # TODO: necessary when targeting real board
-            # ~platform.request("cpu_reset")
-        )
+        # CRG ---------------------------------------------------
+        if not self.is_simulated:
+            # use_ps7_clk = self.cpu_type == "zynq7000"
+            # if use_ps7_clk:
+            #     sys_clk_freq = 100e6
+            # self.crg = _CRG(platform, sys_clk_freq, use_ps7_clk)
+            self.crg = _CRG(platform, sys_clk_freq, with_dram)
+        else:
+            self.crg = CRG(platform.request("sys_clk"))
 
-        # FPGA identification
-        if not isinstance(platform, SimPlatform):
-            self.submodules.dna = dna.DNA()
-            self.add_csr("dna")
+        if not self.integrated_main_ram_size:
+            self.ddrphy = s7ddrphy.A7DDRPHY(
+                platform.request("ddram"),
+                memtype="DDR3",
+                nphases=4,
+                sys_clk_freq=sys_clk_freq,
+            )
+            self.add_sdram(
+                "sdram",
+                phy=self.ddrphy,
+                module=MT41K128M16(sys_clk_freq, "1:4"),
+                l2_cache_size=8192,
+            )
+
+        # FPGA identification -----------------------------------
+        # if not self.is_simulated:
+        #     self.submodules.dna = dna.DNA()
+        #     self.add_csr("dna")
 
         self.add_comm_capability(comm_protocol=comm_protocol)
         self.add_dilithium()
 
+        self.leds = LedChaser(
+            pads=platform.request_all("user_led"), sys_clk_freq=sys_clk_freq
+        )
+
     def add_comm_capability(self: SoCCore, comm_protocol: str):
         if comm_protocol == "uart":
-            self.add_uart(uart_name="sim")
-
+            if self.is_simulated:
+                self.add_uart(uart_name="sim")
+            else:
+                self.add_uart(uart_name="serial")
         elif comm_protocol == "pcie":
             pass
 
     def add_dilithium(self: SoCCore):
         # For now, Dilithium without DMA
-        self.submodules.stream_bridge = CSRStreamBridge(data_width=64)
+        self.submodules.csr_to_stream_bridge = CSRToStreamBridge(data_width=64)
+        self.submodules.stream_to_csr_bridge = StreamToCSRBridge(data_width=64)
         self.submodules.dilithium = Dilithium()
 
         self.start = CSRStorage(1)
         self.mode = CSRStorage(2)
         self.sec_lvl = CSRStorage(3)
 
-        self.comb += [self.stream_bridge.source.connect(self.dilithium.sink)]
         self.comb += [
+            self.csr_to_stream_bridge.stream.connect(self.dilithium.sink),
+            self.stream_to_csr_bridge.stream.connect(self.dilithium.source),
             self.dilithium.start.eq(self.start.storage),
             self.dilithium.mode.eq(self.mode.storage),
             self.dilithium.sec_lvl.eq(self.sec_lvl.storage),
         ]
 
+    # TODO: extend this once Im using the hardcore, see arty z7 target.
+    # def finalize(self, *args, **kwargs):
+    #     super(ProjectPetalite, self).finalize(*args, **kwargs)
+    #     if self.cpu_type != "zynq7000":
+    #         return
+
 
 def main():
     args = arg_parser()
 
-    io = load_io_from_json(args.io_json)
-    sys_clk_freq = int(args.sys_clk_freq)
+    # Platform definition
+    platform = (
+        PetaliteSimPlatform(io_path=args.io_json)
+        if args.sim
+        else digilent_arty.Platform(variant="a7-100")
+        # else digilent_zybo_z7.Platform(variant="z7-20")
+    )
+    platform.add_source_dir(path=args.rtl_dir_path)
+    platform.add_extension(digilent_arty._sdcard_pmod_io)
 
-    platform = SimulatedPlatform(io)
-    platform.add_rtl_sources(path=args.rtl_dir_path)
-
+    # SoC definition
     soc = ProjectPetalite(
         platform=platform,
-        sys_clk_freq=sys_clk_freq,
+        sys_clk_freq=args.sys_clk_freq,
         comm_protocol=args.comm,
         integrated_rom_init=args.firmware,
     )
 
-    sim_config = SimConfig()
-    sim_config.add_clocker("sys_clk", freq_hz=sys_clk_freq)
+    # Building stage
+    builder = Builder(
+        soc=soc, output_dir=args.build_dir, compile_gateware=args.compile_gateware
+    )
 
-    if args.comm == "uart":
-        sim_config.add_module("serial2console", "serial")
-    elif args.comm == "ethernet":
-        sim_config.add_module(
-            "ethernet", "eth", args={"interface": "tap0", "ip": args.remote_ip}
+    if args.sim:
+        sim_config = SimConfig()
+        sim_config.add_clocker("sys_clk", freq_hz=args.sys_clk_freq)
+        if args.comm == "uart":
+            sim_config.add_module("serial2console", "serial")
+        elif args.comm == "pcie":
+            pass
+
+        builder.build(
+            run=args.load,
+            sim_config=sim_config,
+            interactive=False,
         )
 
-    builder = Builder(
-        soc, output_dir=args.build_dir, compile_gateware=(not args.only_build)
-    )
+    else:
+        builder.build(**platform.get_argdict(platform.toolchain, {}))
 
-    # TODO: sim is considerably slower than an equal configuration on litex_sim... investigate why
-    builder.build(
-        run=(not args.only_build),
-        sim_config=sim_config,
-        interactive=False,
-    )
+        if args.load:
+            prog = platform.create_programmer()
+            prog.load_bitstream(builder.get_bitstream_filename(mode="sram"), device=1)
 
 
 if __name__ == "__main__":

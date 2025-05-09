@@ -20,5 +20,10 @@
             "sink_ready": { "pins": "1" },
             "sink_data": { "pins": "8" }
         }
+    },
+    {
+        "name": "user_led",
+        "index": 0,
+        "pins": "1"
     }
 ]

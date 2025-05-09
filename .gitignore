@@ -6,4 +6,5 @@ firmware
 *.log
 *.str
 *.cache
+*.pyc
 .Xil
