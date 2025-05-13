@@ -8,3 +8,6 @@ firmware
 *.cache
 *.pyc
 .Xil
+*.hw
+*.ip_user_files
+*.sim

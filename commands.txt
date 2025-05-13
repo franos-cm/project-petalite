@@ -38,10 +38,16 @@ sudo meson setup build && cd build && meson install
 source /home/franos/projects/project-petalite/tools/oss-cad-suite/environment
 
 
+-- Questa sim
+export PATH=$PATH:/home/franos/altera/24.1std/questa_fse/bin
+export LM_LICENSE_FILE=/home/franos/altera/LR-233497_License.dat:$LM_LICENSE_FILE
+
+
 # Commands
 ./project-petalite/soc.py --sim=True --compile-gateware --io-json=./project-petalite/data/io_sim.json
 ./project-petalite/software/main.py --build-path=./build --mem=rom
 ./project-petalite/soc.py --firmware=firmware/firmware.bin --io-json=./project-petalite/data/io_sim.json --sys-clk-freq=1e6 --load
+./project-petalite/soc.py --firmware=firmware/firmware.bin --compile-gateware
 
 
 -- Adding swap mem to SoC:

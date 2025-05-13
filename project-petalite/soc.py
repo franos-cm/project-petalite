@@ -17,11 +17,11 @@ from liteeth.phy.mii import LiteEthPHYMII
 from litex.build.sim import SimPlatform
 from litex.build.sim.config import SimConfig
 from litex.build.generic_platform import GenericPlatform
-from litex_boards.platforms import digilent_zybo_z7, digilent_arty
+from litex_boards.platforms import digilent_arty
 
 from dilithium import Dilithium
 from stream_bridge import CSRToStreamBridge, StreamToCSRBridge
-from platform import PetaliteSimPlatform
+from fpga_platform import PetaliteSimPlatform
 from utils import arg_parser
 
 
@@ -98,10 +98,6 @@ class ProjectPetalite(SoCCore):
 
         # CRG ---------------------------------------------------
         if not self.is_simulated:
-            # use_ps7_clk = self.cpu_type == "zynq7000"
-            # if use_ps7_clk:
-            #     sys_clk_freq = 100e6
-            # self.crg = _CRG(platform, sys_clk_freq, use_ps7_clk)
             self.crg = _CRG(platform, sys_clk_freq, with_dram)
         else:
             self.crg = CRG(platform.request("sys_clk"))
@@ -121,12 +117,12 @@ class ProjectPetalite(SoCCore):
             )
 
         # FPGA identification -----------------------------------
-        # if not self.is_simulated:
-        #     self.submodules.dna = dna.DNA()
-        #     self.add_csr("dna")
+        if not self.is_simulated:
+            self.submodules.dna = dna.DNA()
+            self.add_csr("dna")
 
         self.add_comm_capability(comm_protocol=comm_protocol)
-        self.add_dilithium()
+        # self.add_dilithium()
 
         self.leds = LedChaser(
             pads=platform.request_all("user_led"), sys_clk_freq=sys_clk_freq
@@ -174,10 +170,9 @@ def main():
         PetaliteSimPlatform(io_path=args.io_json)
         if args.sim
         else digilent_arty.Platform(variant="a7-100")
-        # else digilent_zybo_z7.Platform(variant="z7-20")
     )
-    platform.add_source_dir(path=args.rtl_dir_path)
-    platform.add_extension(digilent_arty._sdcard_pmod_io)
+    # platform.add_source_dir(path=args.rtl_dir_path)
+    # platform.add_extension(digilent_arty._sdcard_pmod_io)
 
     # SoC definition
     soc = ProjectPetalite(
