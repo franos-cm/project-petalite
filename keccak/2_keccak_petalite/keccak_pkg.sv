@@ -1,4 +1,4 @@
-package keccak_globals;
+package keccak_pkg;
 
   // Constants
   parameter int num_plane = 5;
