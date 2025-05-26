@@ -12,3 +12,4 @@ firmware
 *.ip_user_files
 *.sim
 keccak/*
+dilithium-vivado/*
