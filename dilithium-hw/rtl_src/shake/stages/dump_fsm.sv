@@ -34,7 +34,8 @@ module dump_fsm (
     state_t current_state, next_state;
 
     // State register
-    always_ff @(posedge clk or posedge rst) begin
+    // TODO: double check if this (and other FSMs) reset should be sync or not
+    always_ff @(posedge clk) begin
         if (rst)
             current_state <= IDLE;
         else
@@ -70,8 +71,8 @@ module dump_fsm (
             end
 
             WRITING: begin
+                valid_out = ready_in; // TODO: revise this, not sure if right
                 if (!output_buffer_empty) begin
-                    valid_out = 1;
                     output_buffer_shift_en = ready_in;
                     next_state = WRITING;
                 end

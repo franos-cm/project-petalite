@@ -11,13 +11,13 @@ module piso_buffer #(
 );
     logic [WIDTH-1:0] buffer_data [DEPTH-1:0];
 
-    always_ff @(posedge clk or posedge rst)
-        if (rst) begin
-            // reset
-            for (int i = 0; i < DEPTH; i++)
-                buffer_data[i] <= '0;
-        end
-        else if (write_enable) begin
+    always_ff @(posedge clk)
+        // if (rst) begin
+        //     // reset
+        //     for (int i = 0; i < DEPTH; i++)
+        //         buffer_data[i] <= '0;
+        // end
+        if (write_enable) begin
             for (int i = 0; i < DEPTH; i++)
                 buffer_data[i] <= data_in[(DEPTH-i)*(WIDTH)-1 -: WIDTH];
         end

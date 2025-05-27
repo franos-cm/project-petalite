@@ -43,7 +43,8 @@ module permute_fsm (
     state_t current_state, next_state;
 
     // State register
-    always_ff @(posedge clk or posedge rst) begin
+    // TODO: double check if this (and other FSMs) reset should be sync or not
+    always_ff @(posedge clk) begin
         if (rst)
             current_state <= RESET;
         else
