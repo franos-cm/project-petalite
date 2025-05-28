@@ -1,3 +1,5 @@
+`timescale 1ns / 1ps
+
 module dump_fsm (
     // External inputs
     input  logic clk,

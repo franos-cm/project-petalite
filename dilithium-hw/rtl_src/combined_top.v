@@ -221,27 +221,61 @@ module combined_top #(
     reg  dst_write_fsm;
     reg  dst_ready_fsm;
 
+    // Debug
+    wire [63:0] test_dout [2:0];   
+    wire [2:0] test_src_read;
+    wire [2:0] test_dst_write;
+    wire [2:0] same_dout;
+    wire [2:0] same_src_read;
+    wire [2:0] same_dst_write;
+
     genvar g;
     generate
         for (g = 0; g < 3; g = g + 1) begin
-            // keccak_top KECCAK(      
-            //         rst_k[g], clk, src_ready[g], src_read[g], dst_ready[g], dst_write[g], din[g], dout[g]
-            //     ); 
 
             keccak KECCAK(
                 .clk        (clk),
                 .rst        (rst_k[g]),
-
                 .valid_in   (src_ready[g]),
-                .ready_out  (src_read[g]),
                 .ready_in   (dst_ready[g]),
-                .valid_out  (dst_write[g]),
-
                 .data_in    (din[g]),
+            
+                .ready_out  (src_read[g]),
+                .valid_out  (dst_write[g]),
                 .data_out   (dout[g])
             );
+            // assign same_dout[g]       = (dout[g]       == test_dout[g]);
+            // assign same_src_read[g]   = (src_read[g]   == test_src_read[g]);
+            // assign same_dst_write[g]  = (dst_write[g]  == test_dst_write[g]);
         end
     endgenerate
+
+    // keccak_top OLD_KECCAK(      
+    //     // .rst (rst_k[g])
+    //     .clk (clk)
+    //     // Inputs
+    //     // .src_ready (src_ready[g]),
+    //     // .dst_ready (dst_ready[g]),
+    //     //.din (din[g])
+    //     // Outputs
+    //     // .src_read (test_src_read[g]),
+    //     // .dst_write (test_dst_write[g]),
+    //     // .dout (test_dout[g])
+    // );
+
+    // clock_consumer CLOCK_CONSUME(
+    //     .clk (clk)
+    // );
+
+    wire clk_test;
+    assign clk_test = clk;
+    clock_consumer_v2 CLOCK_CONSUME_V2 (
+        .clk (clk)
+    );
+
+    // clock_consumer_v3 CLOCK_CONSUME_V3(
+    //     .clk (clk)
+    // );
 
     // Gen S polys submodule
     reg             start_s, rst_s;

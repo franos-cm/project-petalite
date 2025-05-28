@@ -1,3 +1,5 @@
+`timescale 1ns / 1ps
+
 module load_fsm (
     // External inputs
     input  logic clk,

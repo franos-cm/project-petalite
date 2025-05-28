@@ -107,7 +107,7 @@ module tb_keygen_top;
      reg [3:0] state = 0;    
   
     initial begin
-        results_file = $fopen("/home/franos/projects/project-petalite/dilithium-hw/KAT/tb_keygen_results.txt","w");
+        results_file = $fopen("/home/franos/projects/alt/project-petalite/dilithium-hw/KAT/tb_keygen_results.txt","w");
         $readmemh("/home/franos/projects/project-petalite/dilithium-hw/KAT/z_2.txt",  seed);
     
         $readmemh("/home/franos/projects/project-petalite/dilithium-hw/KAT/s1_2.txt",  s1_2);

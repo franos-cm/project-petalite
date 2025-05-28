@@ -1,4 +1,4 @@
-package keccak_pkg;
+package keccak_pkg_mine;
 
   // Constants
   localparam int num_plane = 5;

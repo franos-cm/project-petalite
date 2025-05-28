@@ -1,3 +1,5 @@
+`timescale 1ns / 1ps
+
 module piso_buffer #(
     parameter int WIDTH,
     parameter int DEPTH
@@ -25,7 +27,7 @@ module piso_buffer #(
                 // shift
                 for (int i = DEPTH - 1; i > 0; i--)
                     buffer_data[i] <= buffer_data[i - 1];
-                buffer_data[0] <= '0;
+                // buffer_data[0] <= '0;
         end
 
     assign data_out = buffer_data[DEPTH - 1];

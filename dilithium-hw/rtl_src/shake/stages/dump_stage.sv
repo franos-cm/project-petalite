@@ -1,4 +1,5 @@
-import keccak_pkg::*;
+`timescale 1ns / 1ps
+import keccak_pkg_mine::*;
 
 module dump_stage (
     // External inputs

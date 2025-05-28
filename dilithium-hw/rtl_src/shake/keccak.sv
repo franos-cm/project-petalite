@@ -1,4 +1,5 @@
-import keccak_pkg::*;
+`timescale 1ns / 1ps
+import keccak_pkg_mine::*;
 
 
 module keccak (
@@ -138,4 +139,12 @@ module keccak (
     );
 
 
+endmodule
+
+
+
+module clock_consumer_v3 (
+    // Master signals
+    input  logic clk
+);
 endmodule

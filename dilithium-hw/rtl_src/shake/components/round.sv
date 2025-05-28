@@ -1,7 +1,8 @@
-import keccak_pkg::STATE_WIDTH;
-import keccak_pkg::w;
+`timescale 1ns / 1ps
+import keccak_pkg_mine::STATE_WIDTH;
+import keccak_pkg_mine::w;
 
-module keccak_round (
+module round (
   input  logic [STATE_WIDTH-1:0] rin,
   input  logic [w-1:0]           rc,
   output logic [STATE_WIDTH-1:0] rout

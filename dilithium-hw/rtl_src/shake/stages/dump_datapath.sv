@@ -1,4 +1,5 @@
-import keccak_pkg::*;
+`timescale 1ns / 1ps
+import keccak_pkg_mine::*;
 
 
 module dump_datapath (
@@ -41,7 +42,7 @@ module dump_datapath (
     // -------------------- Components --------------------
     //
     // Counter for output buffer
-    countern #(
+    countern_mine #(
         .WIDTH(5)
     ) output_counter (
         .clk  (clk),
@@ -56,7 +57,7 @@ module dump_datapath (
     // Reg for output masking
     // TODO: the slices here are really confusing, which has to do with the definition of w_bit_width. Change this.
     assign remaining_valid_bytes = output_size[w_bit_width-1:3];
-    regn #(
+    regn_mine #(
         .WIDTH(w_bit_width - 3)
     ) output_bytes_reg (
         .clk  (clk),

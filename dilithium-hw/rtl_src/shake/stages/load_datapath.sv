@@ -1,4 +1,5 @@
-import keccak_pkg::*;
+`timescale 1ns / 1ps
+import keccak_pkg_mine::*;
 
 
 module load_datapath (
@@ -41,7 +42,7 @@ module load_datapath (
     // ------------------- Components -------------------
     //
     // Operation mode reg, to decide current block size
-    regn #(
+    regn_mine #(
         .WIDTH(2)
     ) op_mode_reg (
         .clk  (clk),
@@ -52,7 +53,7 @@ module load_datapath (
     );
 
     // Output size reg, to transmit to next pipeline stage
-    regn #(
+    regn_mine #(
         .WIDTH(32)
     ) output_size_reg (
         .clk  (clk),
@@ -99,7 +100,7 @@ module load_datapath (
     );
 
     // Counter for input buffer: corresponds to how many positions are filled
-    countern #(
+    countern_mine #(
         .WIDTH(5)
     ) input_counter (
         .clk  (clk),

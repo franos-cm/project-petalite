@@ -1,3 +1,5 @@
+`timescale 1ns / 1ps
+
 module permute_fsm (
     // External inputs
     input  logic clk,
@@ -38,6 +40,7 @@ module permute_fsm (
         ABSORB_LAST,
         DUMP,
         SQUEEZE,
+        DELAY,
         WAIT_DUMP
     } state_t;
     state_t current_state, next_state;
@@ -133,10 +136,14 @@ module permute_fsm (
 
             // Absorbs last block
             ABSORB_LAST: begin
-                next_state = round_done ? DUMP : ABSORB_LAST;
+                next_state = round_done ? DELAY : ABSORB_LAST;
                 round_en = 1;
                 // NOTE: this round_start condition is necessary so we delay one cycle for XORing the new block
                 absorb_enable = round_start;
+            end
+
+            DELAY: begin
+                next_state = DUMP;
             end
 
             // If output buffer is ready, dump digest on it

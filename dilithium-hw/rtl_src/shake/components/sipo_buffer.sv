@@ -1,3 +1,5 @@
+`timescale 1ns / 1ps
+
 module sipo_buffer #(
     parameter int WIDTH,
     parameter int DEPTH

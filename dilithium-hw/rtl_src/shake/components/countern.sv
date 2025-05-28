@@ -1,4 +1,6 @@
-module countern #(
+`timescale 1ns / 1ps
+
+module countern_mine #(
     parameter int WIDTH = 32
 ) (
     input  logic  clk,

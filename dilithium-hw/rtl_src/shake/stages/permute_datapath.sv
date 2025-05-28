@@ -1,4 +1,5 @@
-import keccak_pkg::*;
+`timescale 1ns / 1ps
+import keccak_pkg_mine::*;
 
 
 module permute_datapath (
@@ -45,7 +46,7 @@ module permute_datapath (
     // ----------------- Components -----------------
     //
     // Reg for current mode, coming from previous stage
-    regn #(
+    regn_mine #(
         .WIDTH(2)
     ) op_mode_reg (
         .clk  (clk),
@@ -57,7 +58,7 @@ module permute_datapath (
 
 
     // Round number counter
-    countern #(
+    countern_mine #(
         .WIDTH(5) 
     ) round_counter (
         .clk (clk),
@@ -77,7 +78,7 @@ module permute_datapath (
     );
 
     // State reg
-    regn #(
+    regn_mine #(
         .WIDTH(STATE_WIDTH)
     ) state_reg (
         .clk  (clk),
@@ -88,7 +89,7 @@ module permute_datapath (
     );
 
     // Keccak round
-    keccak_round round(
+    round round_kec(
         .rin(round_in),
         .rc(round_constant),
         .rout(state_reg_in)
