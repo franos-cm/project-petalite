@@ -78,69 +78,69 @@ architecture struct of keccak_control is
 begin
 
 
-	-- fsm1_gen : entity work.keccak_fsm1(nocounter)
-	-- 	port map (
-    --         clk             => clk,
-    --         rst             => rst,
-    --         final_segment   =>final_segment,
-    --         c               => c,
-    --         en_ctr          => en_ctr_wire,
-    --         en_len          => en_len_wire,
-    --         en_output_len   => en_output_len_wire,
-    --         ein             => ein_wire,
-    --         load_next_block => load_next_block,
-    --         block_ready_set => block_ready_set,
-	-- 	    msg_end_set     => msg_end_set,
-    --         src_ready       => src_ready,
-    --         src_read        => src_read_wire,
-    --         mode            => mode,
-	-- 	    -- pad
-	-- 	    clr_len         => clr_len,
-    --         sel_dec_size    => sel_dec_size,
-    --         last_word       => last_word,
-    --         spos            => spos
-    --     );
+	fsm1_gen : entity work.keccak_fsm1(nocounter)
+		port map (
+            clk             => clk,
+            rst             => rst,
+            final_segment   =>final_segment,
+            c               => c,
+            en_ctr          => en_ctr_wire,
+            en_len          => en_len_wire,
+            en_output_len   => en_output_len_wire,
+            ein             => ein_wire,
+            load_next_block => load_next_block,
+            block_ready_set => block_ready_set,
+		    msg_end_set     => msg_end_set,
+            src_ready       => src_ready,
+            src_read        => src_read_wire,
+            mode            => mode,
+		    -- pad
+		    clr_len         => clr_len,
+            sel_dec_size    => sel_dec_size,
+            last_word       => last_word,
+            spos            => spos
+        );
 
 
 
-	-- fsm2_gen : entity work.keccak_fsm2(beh)
-	-- 	port map(
-    --         clk              => clk,
-    --         rst              => rst,
-    --         wr_state         => wr_state_wire,
-	-- 	    block_ready_clr  => block_ready_clr,
-    --         msg_end_clr      => msg_end_clr,
-	-- 	    block_ready      => block_ready,
-    --         msg_end          => msg_end,
-    --         output_write_set => output_write_set,
-    --         output_busy_set  => output_busy_set,
-	-- 	    output_busy      => output_busy,
-    --         sel_xor          => sel_xor_wire,
-    --         lo               => sel_out_wire,
-	-- 	    sel_final        => sel_final_wire,
-    --         ld_rdctr         => ld_rdctr_wire,
-    --         en_rdctr         => en_rdctr_wire,
-    --         d                => d,
-    --         output_size      => output_size_wire,
-    --         mode             => mode,
-    --         mode_ctrl        => mode_ctrl
-    --     );
+	fsm2_gen : entity work.keccak_fsm2(beh)
+		port map(
+            clk              => clk,
+            rst              => rst,
+            wr_state         => wr_state_wire,
+		    block_ready_clr  => block_ready_clr,
+            msg_end_clr      => msg_end_clr,
+		    block_ready      => block_ready,
+            msg_end          => msg_end,
+            output_write_set => output_write_set,
+            output_busy_set  => output_busy_set,
+		    output_busy      => output_busy,
+            sel_xor          => sel_xor_wire,
+            lo               => sel_out_wire,
+		    sel_final        => sel_final_wire,
+            ld_rdctr         => ld_rdctr_wire,
+            en_rdctr         => en_rdctr_wire,
+            d                => d,
+            output_size      => output_size_wire,
+            mode             => mode,
+            mode_ctrl        => mode_ctrl
+        );
 
-	-- fsm3_gen : entity work.sha3_fsm3(beh)
-	-- 	port map (
-    --         clk              => clk,
-    --         rst              => rst,
-    --         eo               => eo_wire,
-    --         output_write     => output_write,
-    --         output_write_clr => output_write_clr,
-    --         output_busy_clr  => output_busy_clr,
-	-- 	    dst_ready        => dst_ready,
-    --         dst_write        => dst_write_wire,
-    --         output_size      => output_size_wire,
-    --         last_out_word    => last_out_word
-    --     );
+	fsm3_gen : entity work.sha3_fsm3(beh)
+		port map (
+            clk              => clk,
+            rst              => rst,
+            eo               => eo_wire,
+            output_write     => output_write,
+            output_write_clr => output_write_clr,
+            output_busy_clr  => output_busy_clr,
+		    dst_ready        => dst_ready,
+            dst_write        => dst_write_wire,
+            output_size      => output_size_wire,
+            last_out_word    => last_out_word
+        );
 
-	-- load_next_block <= (not block_ready) or block_ready_clr;
+	load_next_block <= (not block_ready) or block_ready_clr;
 
 	-- flags of controller which enables handshaking between fsm's
 
@@ -180,31 +180,31 @@ begin
         output => output_busy
     );
 
-	-- -- output signals are registered
-	-- ein           <= ein_wire;
-	-- en_len        <= en_len_wire;
-    -- en_output_len <= en_output_len_wire;
-	-- en_ctr        <= en_ctr_wire;
-	-- src_read      <= src_read_wire;
+	-- output signals are registered
+	ein           <= ein_wire;
+	en_len        <= en_len_wire;
+    en_output_len <= en_output_len_wire;
+	en_ctr        <= en_ctr_wire;
+	src_read      <= src_read_wire;
 
-	-- reg_out: process( clk )
-	-- begin
-	-- 	if rising_edge( clk ) then
-	-- 		wr_state  <= wr_state_wire;
-	-- 		sel_xor   <= sel_xor_wire;
-	-- 		sel_final <= sel_final_wire;
-	-- 		ld_rdctr  <= ld_rdctr_wire;
-	-- 		en_rdctr  <= en_rdctr_wire;
+	reg_out: process( clk )
+	begin
+		if rising_edge( clk ) then
+			wr_state  <= wr_state_wire;
+			sel_xor   <= sel_xor_wire;
+			sel_final <= sel_final_wire;
+			ld_rdctr  <= ld_rdctr_wire;
+			en_rdctr  <= en_rdctr_wire;
 
-	-- 		-- output
-	-- 		sel_out_wire2 <= sel_out_wire;
-	-- 	end if;
-	-- end process;
+			-- output
+			sel_out_wire2 <= sel_out_wire;
+		end if;
+	end process;
 
-	-- wr_piso_wire <= eo_wire or sel_out_wire2;
-	-- dst_write    <= dst_write_wire;
-	-- sel_out      <= sel_out_wire2;
-	-- wr_piso      <= wr_piso_wire;
-    -- output_size  <= output_size_wire;
+	wr_piso_wire <= eo_wire or sel_out_wire2;
+	dst_write    <= dst_write_wire;
+	sel_out      <= sel_out_wire2;
+	wr_piso      <= wr_piso_wire;
+    output_size  <= output_size_wire;
 
 end struct;

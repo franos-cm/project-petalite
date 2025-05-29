@@ -244,34 +244,34 @@ module combined_top #(
                 .valid_out  (dst_write[g]),
                 .data_out   (dout[g])
             );
-            // assign same_dout[g]       = (dout[g]       == test_dout[g]);
-            // assign same_src_read[g]   = (src_read[g]   == test_src_read[g]);
-            // assign same_dst_write[g]  = (dst_write[g]  == test_dst_write[g]);
+
+            keccak_top OLD_KECCAK(      
+                .rst (rst_k[g]),
+                .clk (clk),
+                // Inputs
+                .src_ready (src_ready[g]),
+                .dst_ready (dst_ready[g]),
+                .din (din[g]),
+                // Outputs
+                .src_read (test_src_read[g]),
+                .dst_write (test_dst_write[g]),
+                .dout (test_dout[g])
+            );
+            assign same_dout[g]       = (dout[g]       == test_dout[g]);
+            assign same_src_read[g]   = (src_read[g]   == test_src_read[g]);
+            assign same_dst_write[g]  = (dst_write[g]  == test_dst_write[g]);
         end
     endgenerate
-
-    // keccak_top OLD_KECCAK(      
-    //     // .rst (rst_k[g])
-    //     .clk (clk)
-    //     // Inputs
-    //     // .src_ready (src_ready[g]),
-    //     // .dst_ready (dst_ready[g]),
-    //     //.din (din[g])
-    //     // Outputs
-    //     // .src_read (test_src_read[g]),
-    //     // .dst_write (test_dst_write[g]),
-    //     // .dout (test_dout[g])
-    // );
 
     // clock_consumer CLOCK_CONSUME(
     //     .clk (clk)
     // );
 
-    wire clk_test;
-    assign clk_test = clk;
-    clock_consumer_v2 CLOCK_CONSUME_V2 (
-        .clk (clk)
-    );
+    // wire clk_test;
+    // assign clk_test = clk;
+    // clock_consumer_v2 CLOCK_CONSUME_V2 (
+    //     .clk (clk)
+    // );
 
     // clock_consumer_v3 CLOCK_CONSUME_V3(
     //     .clk (clk)
