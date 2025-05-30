@@ -38,9 +38,11 @@ module tb_keygen_top;
     wire ready_i, valid_o;
     reg  [63:0] data_i;  
     wire [63:0] data_o;
-    
+
+    wire clk_wire;
+    assign clk_wire = clk;
     combined_top DUT (
-        clk,
+        clk_wire,
         rst,
         start,
         mode,
@@ -142,7 +144,7 @@ module tb_keygen_top;
     end
   
 
-    always @(posedge clk) begin
+    always @(posedge clk_wire) begin
         rst     <= 0;
         valid_i <= 0;
         start   <= 0;
