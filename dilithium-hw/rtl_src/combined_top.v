@@ -235,8 +235,27 @@ module combined_top #(
                 .valid_out  (dst_write[g]),
                 .data_out   (dout[g])
             );
+
+            // keccak_top OLD_KECCAK(      
+            //     .rst (rst_k[g]),
+            //     .clk (clk),
+            //     // Inputs
+            //     .src_ready (src_ready[g]),
+            //     .dst_ready (dst_ready[g]),
+            //     .din (din[g]),
+            //     // Outputs
+            //     .src_read (src_read[g]),
+            //     .dst_write (dst_write[g]),
+            //     .dout (dout[g])
+            // );
+
         end
     endgenerate
+
+
+//    clock_consumer_v2 CLOCK_CONSUME_V2 (
+//        .clk (clk)
+//    );
 
 
     // Gen S polys submodule

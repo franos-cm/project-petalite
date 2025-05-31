@@ -39,10 +39,8 @@ module tb_keygen_top;
     reg  [63:0] data_i;  
     wire [63:0] data_o;
 
-    wire clk_wire;
-    assign clk_wire = clk;
     combined_top DUT (
-        clk_wire,
+        clk,
         rst,
         start,
         mode,
@@ -144,7 +142,7 @@ module tb_keygen_top;
     end
   
 
-    always @(posedge clk_wire) begin
+    always @(posedge clk) begin
         rst     <= 0;
         valid_i <= 0;
         start   <= 0;
@@ -556,6 +554,7 @@ module tb_keygen_top;
                         $display("[T1, %d] Error: Expected %h, received %h", ctr, t1_5[c][ctr*64+:64], data_o); 
                 
                     ctr <= ctr + 1;
+                    // $stop;
                     
                     if (ctr == 20480/64-1) begin
                         ctr <= 0;

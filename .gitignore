@@ -13,3 +13,5 @@ firmware
 *.sim
 keccak/*
 dilithium-vivado/*
+sim
+*xpr

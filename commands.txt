@@ -42,6 +42,33 @@ source /home/franos/projects/project-petalite/tools/oss-cad-suite/environment
 export PATH=$PATH:/home/franos/altera/24.1std/questa_fse/bin
 export LM_LICENSE_FILE=/home/franos/altera/LR-233497_License.dat:$LM_LICENSE_FILE
 
+export PATH=$PATH:/home/franos/intelFPGA_pro/24.2/questa_fse/bin
+export LM_LICENSE_FILE=/home/franos/intelFPGA_pro/LR-236507_License.dat:$LM_LICENSE_FILE
+
+set ::env(LM_LICENSE_FILE)  "/home/franos/intelFPGA_pro/LR-236507_License.dat"
+puts $::env(LM_LICENSE_FILE)
+
+
+-- To run QuestaSim in Vivado:
+1. Install the correct version of QuestaSim, which is 2024.1
+
+1. Install compatible version of gcc, which for Questa 2024.1, is 7.4.
+    1.1. Read https://chatgpt.com/c/68378209-0244-800a-b94b-61cb9fc717f0
+
+sudo update-alternatives --config gcc
+
+2. Change /home/franos/intelFPGA_pro/24.2/questa_fse/bin/vcom to add:
++elif echo "$@" | grep -q -- "-version" ; then
++  exec "$arg0" "$@" | sed 's@ Intel Starter FPGA Edition@Sim@'
+around line 180, right at the end, or so.
+
+3. In Vivado, go to Tools, Compile Simulation libs
+
+4. Wait for compilation (around 1:20h or so)
+
+5. set ::env(LM_LICENSE_FILE)  "/home/franos/intelFPGA_pro/LR-236507_License.dat"
+puts $::env(LM_LICENSE_FILE)
+
 
 # Commands
 ./project-petalite/soc.py --sim=True --compile-gateware --io-json=./project-petalite/data/io_sim.json
