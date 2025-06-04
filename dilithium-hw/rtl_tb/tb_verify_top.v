@@ -29,10 +29,10 @@
 module tb_verify_top;
   reg clk = 1,  rst = 0, start = 0;
   
-  localparam  NUM_TV = 5;
+  localparam  NUM_TV = 10;
 
 
-    reg [2:0] sec_lvl = 5;
+    reg [2:0] sec_lvl = 2;
       
     reg [1:0] mode = 1;
       

@@ -43,9 +43,9 @@ export PATH=$PATH:/home/franos/altera/24.1std/questa_fse/bin
 export LM_LICENSE_FILE=/home/franos/altera/LR-233497_License.dat:$LM_LICENSE_FILE
 
 export PATH=$PATH:/home/franos/intelFPGA_pro/24.2/questa_fse/bin
-export LM_LICENSE_FILE=/home/franos/intelFPGA_pro/LR-236507_License.dat:$LM_LICENSE_FILE
+export LM_LICENSE_FILE=/home/franos/intelFPGA_pro/LR-236587_License.dat:$LM_LICENSE_FILE
 
-set ::env(LM_LICENSE_FILE)  "/home/franos/intelFPGA_pro/LR-236507_License.dat"
+set ::env(LM_LICENSE_FILE)  "/home/franos/intelFPGA_pro/LR-LR-236587_License.dat"
 puts $::env(LM_LICENSE_FILE)
 
 

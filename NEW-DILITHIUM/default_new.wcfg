@@ -3,670 +3,350 @@
    <wave_state>
    </wave_state>
    <db_ref_list>
-      <db_ref path="tb_keygen_top_behav.wdb" id="1">
+      <db_ref path="tb_sign_top_behav.wdb" id="1">
          <top_modules>
             <top_module name="glbl" />
+            <top_module name="keccak_pkg" />
             <top_module name="keccak_pkg_mine" />
-            <top_module name="tb_keygen_top" />
+            <top_module name="sha3_pkg" />
+            <top_module name="tb_sign_top" />
          </top_modules>
       </db_ref>
    </db_ref_list>
    <zoom_setting>
-      <ZoomStartTime time="139,963.054 ns"></ZoomStartTime>
-      <ZoomEndTime time="140,487.390 ns"></ZoomEndTime>
-      <Cursor1Time time="140,400.000 ns"></Cursor1Time>
+      <ZoomStartTime time="520.000 ns"></ZoomStartTime>
+      <ZoomEndTime time="1,025.201 ns"></ZoomEndTime>
+      <Cursor1Time time="650.000 ns"></Cursor1Time>
    </zoom_setting>
    <column_width_setting>
-      <NameColumnWidth column_width="246"></NameColumnWidth>
-      <ValueColumnWidth column_width="148"></ValueColumnWidth>
+      <NameColumnWidth column_width="228"></NameColumnWidth>
+      <ValueColumnWidth column_width="153"></ValueColumnWidth>
    </column_width_setting>
-   <WVObjectSize size="28" />
-   <wave_markers>
-      <marker label="" time="135186200" />
-   </wave_markers>
-   <wvobject type="logic" fp_name="/tb_keygen_top/DUT/CLOCK_CONSUME_V2/clk">
+   <WVObjectSize size="11" />
+   <wvobject type="logic" fp_name="/tb_sign_top/DUT/clk">
       <obj_property name="ElementShortName">clk</obj_property>
       <obj_property name="ObjectShortName">clk</obj_property>
    </wvobject>
-   <wvobject type="logic" fp_name="/tb_keygen_top/DUT/\genblk1[0].KECCAK /clk">
-      <obj_property name="ElementShortName">clk</obj_property>
-      <obj_property name="ObjectShortName">clk</obj_property>
-   </wvobject>
-   <wvobject type="logic" fp_name="/tb_keygen_top/clk">
-      <obj_property name="ElementShortName">clk</obj_property>
-      <obj_property name="ObjectShortName">clk</obj_property>
-   </wvobject>
-   <wvobject type="logic" fp_name="/tb_keygen_top/rst">
+   <wvobject type="logic" fp_name="/tb_sign_top/DUT/rst">
       <obj_property name="ElementShortName">rst</obj_property>
       <obj_property name="ObjectShortName">rst</obj_property>
    </wvobject>
-   <wvobject type="group" fp_name="group59">
-      <obj_property name="label">tb</obj_property>
-      <obj_property name="DisplayName">label</obj_property>
-      <wvobject type="logic" fp_name="/tb_keygen_top/start">
-         <obj_property name="ElementShortName">start</obj_property>
-         <obj_property name="ObjectShortName">start</obj_property>
-      </wvobject>
-      <wvobject type="array" fp_name="/tb_keygen_top/sec_lvl">
-         <obj_property name="ElementShortName">sec_lvl[2:0]</obj_property>
-         <obj_property name="ObjectShortName">sec_lvl[2:0]</obj_property>
-      </wvobject>
-      <wvobject type="array" fp_name="/tb_keygen_top/mode">
-         <obj_property name="ElementShortName">mode[1:0]</obj_property>
-         <obj_property name="ObjectShortName">mode[1:0]</obj_property>
-      </wvobject>
-      <wvobject type="logic" fp_name="/tb_keygen_top/valid_i">
-         <obj_property name="ElementShortName">valid_i</obj_property>
-         <obj_property name="ObjectShortName">valid_i</obj_property>
-      </wvobject>
-      <wvobject type="logic" fp_name="/tb_keygen_top/ready_o">
-         <obj_property name="ElementShortName">ready_o</obj_property>
-         <obj_property name="ObjectShortName">ready_o</obj_property>
-      </wvobject>
-      <wvobject type="logic" fp_name="/tb_keygen_top/ready_i">
-         <obj_property name="ElementShortName">ready_i</obj_property>
-         <obj_property name="ObjectShortName">ready_i</obj_property>
-      </wvobject>
-      <wvobject type="logic" fp_name="/tb_keygen_top/valid_o">
-         <obj_property name="ElementShortName">valid_o</obj_property>
-         <obj_property name="ObjectShortName">valid_o</obj_property>
-      </wvobject>
-      <wvobject type="array" fp_name="/tb_keygen_top/data_i">
-         <obj_property name="ElementShortName">data_i[63:0]</obj_property>
-         <obj_property name="ObjectShortName">data_i[63:0]</obj_property>
-      </wvobject>
-      <wvobject type="array" fp_name="/tb_keygen_top/data_o">
-         <obj_property name="ElementShortName">data_o[63:0]</obj_property>
-         <obj_property name="ObjectShortName">data_o[63:0]</obj_property>
-      </wvobject>
-      <wvobject type="array" fp_name="/tb_keygen_top/seed">
-         <obj_property name="ElementShortName">seed[0:0][255:0]</obj_property>
-         <obj_property name="ObjectShortName">seed[0:0][255:0]</obj_property>
-      </wvobject>
-      <wvobject type="array" fp_name="/tb_keygen_top/s1_2">
-         <obj_property name="ElementShortName">s1_2[0:0][0:3071]</obj_property>
-         <obj_property name="ObjectShortName">s1_2[0:0][0:3071]</obj_property>
-      </wvobject>
-      <wvobject type="array" fp_name="/tb_keygen_top/s2_2">
-         <obj_property name="ElementShortName">s2_2[0:0][0:3071]</obj_property>
-         <obj_property name="ObjectShortName">s2_2[0:0][0:3071]</obj_property>
-      </wvobject>
-      <wvobject type="array" fp_name="/tb_keygen_top/t0_2">
-         <obj_property name="ElementShortName">t0_2[0:0][0:13311]</obj_property>
-         <obj_property name="ObjectShortName">t0_2[0:0][0:13311]</obj_property>
-      </wvobject>
-      <wvobject type="array" fp_name="/tb_keygen_top/t1_2">
-         <obj_property name="ElementShortName">t1_2[0:0][0:10239]</obj_property>
-         <obj_property name="ObjectShortName">t1_2[0:0][0:10239]</obj_property>
-      </wvobject>
-      <wvobject type="array" fp_name="/tb_keygen_top/k_2">
-         <obj_property name="ElementShortName">k_2[0:0][0:255]</obj_property>
-         <obj_property name="ObjectShortName">k_2[0:0][0:255]</obj_property>
-      </wvobject>
-      <wvobject type="array" fp_name="/tb_keygen_top/rho_2">
-         <obj_property name="ElementShortName">rho_2[0:0][0:255]</obj_property>
-         <obj_property name="ObjectShortName">rho_2[0:0][0:255]</obj_property>
-      </wvobject>
-      <wvobject type="array" fp_name="/tb_keygen_top/tr_2">
-         <obj_property name="ElementShortName">tr_2[0:0][0:255]</obj_property>
-         <obj_property name="ObjectShortName">tr_2[0:0][0:255]</obj_property>
-      </wvobject>
-      <wvobject type="array" fp_name="/tb_keygen_top/s1_3">
-         <obj_property name="ElementShortName">s1_3[0:0][0:5119]</obj_property>
-         <obj_property name="ObjectShortName">s1_3[0:0][0:5119]</obj_property>
-      </wvobject>
-      <wvobject type="array" fp_name="/tb_keygen_top/s2_3">
-         <obj_property name="ElementShortName">s2_3[0:0][0:6143]</obj_property>
-         <obj_property name="ObjectShortName">s2_3[0:0][0:6143]</obj_property>
-      </wvobject>
-      <wvobject type="array" fp_name="/tb_keygen_top/k_3">
-         <obj_property name="ElementShortName">k_3[0:0][0:255]</obj_property>
-         <obj_property name="ObjectShortName">k_3[0:0][0:255]</obj_property>
-      </wvobject>
-      <wvobject type="array" fp_name="/tb_keygen_top/rho_3">
-         <obj_property name="ElementShortName">rho_3[0:0][0:255]</obj_property>
-         <obj_property name="ObjectShortName">rho_3[0:0][0:255]</obj_property>
-      </wvobject>
-      <wvobject type="array" fp_name="/tb_keygen_top/t0_3">
-         <obj_property name="ElementShortName">t0_3[0:0][0:19967]</obj_property>
-         <obj_property name="ObjectShortName">t0_3[0:0][0:19967]</obj_property>
-      </wvobject>
-      <wvobject type="array" fp_name="/tb_keygen_top/t1_3">
-         <obj_property name="ElementShortName">t1_3[0:0][0:15359]</obj_property>
-         <obj_property name="ObjectShortName">t1_3[0:0][0:15359]</obj_property>
-      </wvobject>
-      <wvobject type="array" fp_name="/tb_keygen_top/tr_3">
-         <obj_property name="ElementShortName">tr_3[0:0][0:255]</obj_property>
-         <obj_property name="ObjectShortName">tr_3[0:0][0:255]</obj_property>
-      </wvobject>
-      <wvobject type="array" fp_name="/tb_keygen_top/results_file">
-         <obj_property name="ElementShortName">results_file[31:0]</obj_property>
-         <obj_property name="ObjectShortName">results_file[31:0]</obj_property>
-      </wvobject>
-      <wvobject type="array" fp_name="/tb_keygen_top/s1_5">
-         <obj_property name="ElementShortName">s1_5[0:0][0:5375]</obj_property>
-         <obj_property name="ObjectShortName">s1_5[0:0][0:5375]</obj_property>
-      </wvobject>
-      <wvobject type="array" fp_name="/tb_keygen_top/s1_5_print">
-         <obj_property name="ElementShortName">s1_5_print[0:5375]</obj_property>
-         <obj_property name="ObjectShortName">s1_5_print[0:5375]</obj_property>
-      </wvobject>
-      <wvobject type="array" fp_name="/tb_keygen_top/s2_5">
-         <obj_property name="ElementShortName">s2_5[0:0][0:6143]</obj_property>
-         <obj_property name="ObjectShortName">s2_5[0:0][0:6143]</obj_property>
-      </wvobject>
-      <wvobject type="array" fp_name="/tb_keygen_top/s2_5_print">
-         <obj_property name="ElementShortName">s2_5_print[0:6143]</obj_property>
-         <obj_property name="ObjectShortName">s2_5_print[0:6143]</obj_property>
-      </wvobject>
-      <wvobject type="array" fp_name="/tb_keygen_top/k_5">
-         <obj_property name="ElementShortName">k_5[0:0][0:255]</obj_property>
-         <obj_property name="ObjectShortName">k_5[0:0][0:255]</obj_property>
-      </wvobject>
-      <wvobject type="array" fp_name="/tb_keygen_top/k_5_print">
-         <obj_property name="ElementShortName">k_5_print[0:255]</obj_property>
-         <obj_property name="ObjectShortName">k_5_print[0:255]</obj_property>
-      </wvobject>
-      <wvobject type="array" fp_name="/tb_keygen_top/rho_5">
-         <obj_property name="ElementShortName">rho_5[0:0][0:255]</obj_property>
-         <obj_property name="ObjectShortName">rho_5[0:0][0:255]</obj_property>
-      </wvobject>
-      <wvobject type="array" fp_name="/tb_keygen_top/rho_5_print">
-         <obj_property name="ElementShortName">rho_5_print[0:255]</obj_property>
-         <obj_property name="ObjectShortName">rho_5_print[0:255]</obj_property>
-      </wvobject>
-      <wvobject type="array" fp_name="/tb_keygen_top/t0_5">
-         <obj_property name="ElementShortName">t0_5[0:0][0:26623]</obj_property>
-         <obj_property name="ObjectShortName">t0_5[0:0][0:26623]</obj_property>
-      </wvobject>
-      <wvobject type="array" fp_name="/tb_keygen_top/t0_5_print">
-         <obj_property name="ElementShortName">t0_5_print[0:26623]</obj_property>
-         <obj_property name="ObjectShortName">t0_5_print[0:26623]</obj_property>
-      </wvobject>
-      <wvobject type="array" fp_name="/tb_keygen_top/t1_5">
-         <obj_property name="ElementShortName">t1_5[0:0][0:20479]</obj_property>
-         <obj_property name="ObjectShortName">t1_5[0:0][0:20479]</obj_property>
-      </wvobject>
-      <wvobject type="array" fp_name="/tb_keygen_top/t1_5_print">
-         <obj_property name="ElementShortName">t1_5_print[0:20479]</obj_property>
-         <obj_property name="ObjectShortName">t1_5_print[0:20479]</obj_property>
-      </wvobject>
-      <wvobject type="array" fp_name="/tb_keygen_top/tr_5">
-         <obj_property name="ElementShortName">tr_5[0:0][0:255]</obj_property>
-         <obj_property name="ObjectShortName">tr_5[0:0][0:255]</obj_property>
-      </wvobject>
-      <wvobject type="array" fp_name="/tb_keygen_top/tr_5_print">
-         <obj_property name="ElementShortName">tr_5_print[0:255]</obj_property>
-         <obj_property name="ObjectShortName">tr_5_print[0:255]</obj_property>
-      </wvobject>
-      <wvobject type="array" fp_name="/tb_keygen_top/ctr">
-         <obj_property name="ElementShortName">ctr[9:0]</obj_property>
-         <obj_property name="ObjectShortName">ctr[9:0]</obj_property>
-      </wvobject>
-      <wvobject type="array" fp_name="/tb_keygen_top/c">
-         <obj_property name="ElementShortName">c[9:0]</obj_property>
-         <obj_property name="ObjectShortName">c[9:0]</obj_property>
-      </wvobject>
-      <wvobject type="array" fp_name="/tb_keygen_top/start_time">
-         <obj_property name="ElementShortName">start_time[31:0]</obj_property>
-         <obj_property name="ObjectShortName">start_time[31:0]</obj_property>
-      </wvobject>
-      <wvobject type="array" fp_name="/tb_keygen_top/state">
-         <obj_property name="ElementShortName">state[3:0]</obj_property>
-         <obj_property name="ObjectShortName">state[3:0]</obj_property>
-      </wvobject>
-      <wvobject type="array" fp_name="/tb_keygen_top/NUM_TV">
-         <obj_property name="ElementShortName">NUM_TV[31:0]</obj_property>
-         <obj_property name="ObjectShortName">NUM_TV[31:0]</obj_property>
-      </wvobject>
-      <wvobject type="array" fp_name="/tb_keygen_top/S_INIT">
-         <obj_property name="ElementShortName">S_INIT[3:0]</obj_property>
-         <obj_property name="ObjectShortName">S_INIT[3:0]</obj_property>
-      </wvobject>
-      <wvobject type="array" fp_name="/tb_keygen_top/S_START">
-         <obj_property name="ElementShortName">S_START[3:0]</obj_property>
-         <obj_property name="ObjectShortName">S_START[3:0]</obj_property>
-      </wvobject>
-      <wvobject type="array" fp_name="/tb_keygen_top/S_Z">
-         <obj_property name="ElementShortName">S_Z[3:0]</obj_property>
-         <obj_property name="ObjectShortName">S_Z[3:0]</obj_property>
-      </wvobject>
-      <wvobject type="array" fp_name="/tb_keygen_top/S_RHO">
-         <obj_property name="ElementShortName">S_RHO[3:0]</obj_property>
-         <obj_property name="ObjectShortName">S_RHO[3:0]</obj_property>
-      </wvobject>
-      <wvobject type="array" fp_name="/tb_keygen_top/S_K">
-         <obj_property name="ElementShortName">S_K[3:0]</obj_property>
-         <obj_property name="ObjectShortName">S_K[3:0]</obj_property>
-      </wvobject>
-      <wvobject type="array" fp_name="/tb_keygen_top/S_S1">
-         <obj_property name="ElementShortName">S_S1[3:0]</obj_property>
-         <obj_property name="ObjectShortName">S_S1[3:0]</obj_property>
-      </wvobject>
-      <wvobject type="array" fp_name="/tb_keygen_top/S_S2">
-         <obj_property name="ElementShortName">S_S2[3:0]</obj_property>
-         <obj_property name="ObjectShortName">S_S2[3:0]</obj_property>
-      </wvobject>
-      <wvobject type="array" fp_name="/tb_keygen_top/S_T1">
-         <obj_property name="ElementShortName">S_T1[3:0]</obj_property>
-         <obj_property name="ObjectShortName">S_T1[3:0]</obj_property>
-      </wvobject>
-      <wvobject type="array" fp_name="/tb_keygen_top/S_T0">
-         <obj_property name="ElementShortName">S_T0[3:0]</obj_property>
-         <obj_property name="ObjectShortName">S_T0[3:0]</obj_property>
-      </wvobject>
-      <wvobject type="array" fp_name="/tb_keygen_top/S_TR">
-         <obj_property name="ElementShortName">S_TR[3:0]</obj_property>
-         <obj_property name="ObjectShortName">S_TR[3:0]</obj_property>
-      </wvobject>
-      <wvobject type="array" fp_name="/tb_keygen_top/S_STALL">
-         <obj_property name="ElementShortName">S_STALL[3:0]</obj_property>
-         <obj_property name="ObjectShortName">S_STALL[3:0]</obj_property>
-      </wvobject>
-      <wvobject type="array" fp_name="/tb_keygen_top/S_STOP">
-         <obj_property name="ElementShortName">S_STOP[3:0]</obj_property>
-         <obj_property name="ObjectShortName">S_STOP[3:0]</obj_property>
-      </wvobject>
-   </wvobject>
-   <wvobject type="array" fp_name="/tb_keygen_top/DUT/same_dout">
+   <wvobject type="array" fp_name="/tb_sign_top/DUT/same_dout">
       <obj_property name="ElementShortName">same_dout[2:0]</obj_property>
       <obj_property name="ObjectShortName">same_dout[2:0]</obj_property>
-      <obj_property name="CustomSignalColor">#F0E68C</obj_property>
-      <obj_property name="UseCustomSignalColor">true</obj_property>
+      <obj_property name="isExpanded"></obj_property>
    </wvobject>
-   <wvobject type="array" fp_name="/tb_keygen_top/DUT/same_src_read">
-      <obj_property name="ElementShortName">same_src_read[2:0]</obj_property>
-      <obj_property name="ObjectShortName">same_src_read[2:0]</obj_property>
-      <obj_property name="CustomSignalColor">#FAAFBE</obj_property>
-      <obj_property name="UseCustomSignalColor">true</obj_property>
-   </wvobject>
-   <wvobject type="array" fp_name="/tb_keygen_top/DUT/same_dst_write">
+   <wvobject type="array" fp_name="/tb_sign_top/DUT/same_dst_write">
       <obj_property name="ElementShortName">same_dst_write[2:0]</obj_property>
       <obj_property name="ObjectShortName">same_dst_write[2:0]</obj_property>
-      <obj_property name="CustomSignalColor">#FF0080</obj_property>
-      <obj_property name="UseCustomSignalColor">true</obj_property>
    </wvobject>
-   <wvobject type="group" fp_name="group86">
-      <obj_property name="label">my keccak2</obj_property>
+   <wvobject type="array" fp_name="/tb_sign_top/DUT/same_src_read">
+      <obj_property name="ElementShortName">same_src_read[2:0]</obj_property>
+      <obj_property name="ObjectShortName">same_src_read[2:0]</obj_property>
+   </wvobject>
+   <wvobject type="group" fp_name="group158">
+      <obj_property name="label">Keccak0</obj_property>
       <obj_property name="DisplayName">label</obj_property>
-      <obj_property name="isExpanded"></obj_property>
-      <wvobject type="array" fp_name="/tb_keygen_top/DUT/\genblk1[2].KECCAK /load_pipeline_stage/load_stage_fsm/current_state">
-         <obj_property name="ElementShortName">current_state[5:0]</obj_property>
-         <obj_property name="ObjectShortName">current_state[5:0]</obj_property>
+      <wvobject type="array" fp_name="/tb_sign_top/DUT/genblk1[0].OLD_KECCAK/dout">
+         <obj_property name="ElementShortName">dout[63:0]</obj_property>
+         <obj_property name="ObjectShortName">dout[63:0]</obj_property>
       </wvobject>
-      <wvobject type="array" fp_name="/tb_keygen_top/DUT/\genblk1[2].KECCAK /permute_pipeline_stage/permute_stage_fsm/current_state">
-         <obj_property name="ElementShortName">current_state[5:0]</obj_property>
-         <obj_property name="ObjectShortName">current_state[5:0]</obj_property>
+      <wvobject type="logic" fp_name="/tb_sign_top/DUT/genblk1[0].OLD_KECCAK/dst_write">
+         <obj_property name="ElementShortName">dst_write</obj_property>
+         <obj_property name="ObjectShortName">dst_write</obj_property>
       </wvobject>
-      <wvobject type="logic" fp_name="/tb_keygen_top/DUT/\genblk1[2].KECCAK /load_pipeline_stage/load_stage_fsm/padding_enable">
-         <obj_property name="ElementShortName">padding_enable</obj_property>
-         <obj_property name="ObjectShortName">padding_enable</obj_property>
+      <wvobject type="logic" fp_name="/tb_sign_top/DUT/genblk1[0].OLD_KECCAK/src_read">
+         <obj_property name="ElementShortName">src_read</obj_property>
+         <obj_property name="ObjectShortName">src_read</obj_property>
       </wvobject>
-      <wvobject type="logic" fp_name="/tb_keygen_top/DUT/\genblk1[2].KECCAK /load_pipeline_stage/load_stage_fsm/first_incomplete_input_word">
-         <obj_property name="ElementShortName">first_incomplete_input_word</obj_property>
-         <obj_property name="ObjectShortName">first_incomplete_input_word</obj_property>
+      <wvobject type="array" fp_name="/tb_sign_top/DUT/\genblk1[0].KECCAK /data_out">
+         <obj_property name="ElementShortName">data_out[63:0]</obj_property>
+         <obj_property name="ObjectShortName">data_out[63:0]</obj_property>
       </wvobject>
-      <wvobject type="logic" fp_name="/tb_keygen_top/DUT/\genblk1[2].KECCAK /load_pipeline_stage/load_stage_fsm/load_enable">
+      <wvobject type="logic" fp_name="/tb_sign_top/DUT/\genblk1[0].KECCAK /valid_out">
+         <obj_property name="ElementShortName">valid_out</obj_property>
+         <obj_property name="ObjectShortName">valid_out</obj_property>
+      </wvobject>
+      <wvobject type="logic" fp_name="/tb_sign_top/DUT/\genblk1[0].KECCAK /ready_out">
+         <obj_property name="ElementShortName">ready_out</obj_property>
+         <obj_property name="ObjectShortName">ready_out</obj_property>
+      </wvobject>
+      <wvobject type="logic" fp_name="/tb_sign_top/DUT/\genblk1[0].KECCAK /rst">
+         <obj_property name="ElementShortName">rst</obj_property>
+         <obj_property name="ObjectShortName">rst</obj_property>
+      </wvobject>
+   </wvobject>
+   <wvobject type="group" fp_name="group165">
+      <obj_property name="label">Keccak1</obj_property>
+      <obj_property name="DisplayName">label</obj_property>
+      <wvobject type="logic" fp_name="/tb_sign_top/DUT/\genblk1[1].KECCAK /ready_in_internal">
+         <obj_property name="ElementShortName">ready_in_internal</obj_property>
+         <obj_property name="ObjectShortName">ready_in_internal</obj_property>
+      </wvobject>
+      <wvobject type="logic" fp_name="/tb_sign_top/DUT/\genblk1[1].KECCAK /rst">
+         <obj_property name="ElementShortName">rst</obj_property>
+         <obj_property name="ObjectShortName">rst</obj_property>
+      </wvobject>
+      <wvobject type="array" fp_name="/tb_sign_top/DUT/\genblk1[1].KECCAK /data_in">
+         <obj_property name="ElementShortName">data_in[63:0]</obj_property>
+         <obj_property name="ObjectShortName">data_in[63:0]</obj_property>
+      </wvobject>
+      <wvobject type="array" fp_name="/tb_sign_top/DUT/\genblk1[1].KECCAK /dump_pipeline_stage/dump_stage_datapath/output_counter/_max_count">
+         <obj_property name="ElementShortName">_max_count[4:0]</obj_property>
+         <obj_property name="ObjectShortName">_max_count[4:0]</obj_property>
+      </wvobject>
+      <wvobject type="array" fp_name="/tb_sign_top/DUT/\genblk1[1].KECCAK /dump_pipeline_stage/dump_stage_datapath/output_counter/_counter">
+         <obj_property name="ElementShortName">_counter[4:0]</obj_property>
+         <obj_property name="ObjectShortName">_counter[4:0]</obj_property>
+      </wvobject>
+      <wvobject type="array" fp_name="/tb_sign_top/DUT/\genblk1[1].KECCAK /dump_pipeline_stage/dump_stage_datapath/output_buffer/buffer_data">
+         <obj_property name="ElementShortName">buffer_data[20:0][63:0]</obj_property>
+         <obj_property name="ObjectShortName">buffer_data[20:0][63:0]</obj_property>
+      </wvobject>
+      <wvobject type="array" fp_name="/tb_sign_top/DUT/genblk1[1].OLD_KECCAK/dout">
+         <obj_property name="ElementShortName">dout[63:0]</obj_property>
+         <obj_property name="ObjectShortName">dout[63:0]</obj_property>
+      </wvobject>
+      <wvobject type="array" fp_name="/tb_sign_top/DUT/\genblk1[1].KECCAK /data_out">
+         <obj_property name="ElementShortName">data_out[63:0]</obj_property>
+         <obj_property name="ObjectShortName">data_out[63:0]</obj_property>
+      </wvobject>
+      <wvobject type="logic" fp_name="/tb_sign_top/DUT/genblk1[1].OLD_KECCAK/dst_write">
+         <obj_property name="ElementShortName">dst_write</obj_property>
+         <obj_property name="ObjectShortName">dst_write</obj_property>
+      </wvobject>
+      <wvobject type="logic" fp_name="/tb_sign_top/DUT/\genblk1[1].KECCAK /valid_out">
+         <obj_property name="ElementShortName">valid_out</obj_property>
+         <obj_property name="ObjectShortName">valid_out</obj_property>
+      </wvobject>
+      <wvobject type="logic" fp_name="/tb_sign_top/DUT/\genblk1[1].KECCAK /valid_in_internal">
+         <obj_property name="ElementShortName">valid_in_internal</obj_property>
+         <obj_property name="ObjectShortName">valid_in_internal</obj_property>
+         <obj_property name="CustomSignalColor">#FF00FF</obj_property>
+         <obj_property name="UseCustomSignalColor">true</obj_property>
+      </wvobject>
+      <wvobject type="logic" fp_name="/tb_sign_top/DUT/\genblk1[1].KECCAK /ready_out">
+         <obj_property name="ElementShortName">ready_out</obj_property>
+         <obj_property name="ObjectShortName">ready_out</obj_property>
+      </wvobject>
+      <wvobject type="logic" fp_name="/tb_sign_top/DUT/genblk1[1].OLD_KECCAK/src_read">
+         <obj_property name="ElementShortName">src_read</obj_property>
+         <obj_property name="ObjectShortName">src_read</obj_property>
+      </wvobject>
+      <wvobject type="logic" fp_name="/tb_sign_top/DUT/\genblk1[1].KECCAK /load_pipeline_stage/load_stage_fsm/load_enable">
          <obj_property name="ElementShortName">load_enable</obj_property>
          <obj_property name="ObjectShortName">load_enable</obj_property>
+         <obj_property name="CustomSignalColor">#FFD700</obj_property>
+         <obj_property name="UseCustomSignalColor">true</obj_property>
       </wvobject>
-      <wvobject type="logic" fp_name="/tb_keygen_top/DUT/\genblk1[2].KECCAK /load_pipeline_stage/load_stage_fsm/input_size_reached">
+      <wvobject type="logic" fp_name="/tb_sign_top/DUT/\genblk1[1].KECCAK /load_pipeline_stage/load_stage_fsm/last_input_block">
+         <obj_property name="ElementShortName">last_input_block</obj_property>
+         <obj_property name="ObjectShortName">last_input_block</obj_property>
+      </wvobject>
+      <wvobject type="logic" fp_name="/tb_sign_top/DUT/\genblk1[1].KECCAK /load_pipeline_stage/load_stage_fsm/input_size_reached">
          <obj_property name="ElementShortName">input_size_reached</obj_property>
          <obj_property name="ObjectShortName">input_size_reached</obj_property>
       </wvobject>
-      <wvobject type="logic" fp_name="/tb_keygen_top/DUT/\genblk1[2].KECCAK /rst">
-         <obj_property name="ElementShortName">rst</obj_property>
-         <obj_property name="ObjectShortName">rst</obj_property>
-         <obj_property name="CustomSignalColor">#FFA500</obj_property>
-         <obj_property name="UseCustomSignalColor">true</obj_property>
+      <wvobject type="array" fp_name="/tb_sign_top/DUT/\genblk1[1].KECCAK /load_pipeline_stage/load_stage_datapath/input_counter/_counter">
+         <obj_property name="ElementShortName">_counter[4:0]</obj_property>
+         <obj_property name="ObjectShortName">_counter[4:0]</obj_property>
+         <obj_property name="Radix">UNSIGNEDDECRADIX</obj_property>
       </wvobject>
-      <wvobject type="logic" fp_name="/tb_keygen_top/DUT/\genblk1[2].KECCAK /valid_in">
-         <obj_property name="ElementShortName">valid_in</obj_property>
-         <obj_property name="ObjectShortName">valid_in</obj_property>
-         <obj_property name="CustomSignalColor">#00FFFF</obj_property>
-         <obj_property name="UseCustomSignalColor">true</obj_property>
+      <wvobject type="array" fp_name="/tb_sign_top/DUT/\genblk1[1].KECCAK /load_pipeline_stage/load_stage_fsm/current_state">
+         <obj_property name="ElementShortName">current_state[5:0]</obj_property>
+         <obj_property name="ObjectShortName">current_state[5:0]</obj_property>
       </wvobject>
-      <wvobject type="logic" fp_name="/tb_keygen_top/DUT/\genblk1[2].KECCAK /ready_out">
-         <obj_property name="ElementShortName">ready_out</obj_property>
-         <obj_property name="ObjectShortName">ready_out</obj_property>
+      <wvobject type="other" fp_name="/tb_sign_top/DUT/genblk1[1].OLD_KECCAK/control_gen/fsm1_gen/cstate_fsm1">
+         <obj_property name="ElementShortName">cstate_fsm1</obj_property>
+         <obj_property name="ObjectShortName">cstate_fsm1</obj_property>
+      </wvobject>
+      <wvobject type="array" fp_name="/tb_sign_top/DUT/\genblk1[1].KECCAK /permute_pipeline_stage/permute_stage_fsm/current_state">
+         <obj_property name="ElementShortName">current_state[5:0]</obj_property>
+         <obj_property name="ObjectShortName">current_state[5:0]</obj_property>
          <obj_property name="CustomSignalColor">#FF00FF</obj_property>
          <obj_property name="UseCustomSignalColor">true</obj_property>
       </wvobject>
-      <wvobject type="logic" fp_name="/tb_keygen_top/DUT/\genblk1[2].KECCAK /ready_in">
-         <obj_property name="ElementShortName">ready_in</obj_property>
-         <obj_property name="ObjectShortName">ready_in</obj_property>
+      <wvobject type="other" fp_name="/tb_sign_top/DUT/genblk1[1].OLD_KECCAK/control_gen/fsm2_gen/cstate">
+         <obj_property name="ElementShortName">cstate</obj_property>
+         <obj_property name="ObjectShortName">cstate</obj_property>
+         <obj_property name="CustomSignalColor">#FF00FF</obj_property>
+         <obj_property name="UseCustomSignalColor">true</obj_property>
+      </wvobject>
+      <wvobject type="logic" fp_name="/tb_sign_top/DUT/\genblk1[1].KECCAK /dump_pipeline_stage/output_buffer_we">
+         <obj_property name="ElementShortName">output_buffer_we</obj_property>
+         <obj_property name="ObjectShortName">output_buffer_we</obj_property>
+      </wvobject>
+      <wvobject type="logic" fp_name="/tb_sign_top/DUT/\genblk1[1].KECCAK /dump_pipeline_stage/intermediate_buffer_we">
+         <obj_property name="ElementShortName">intermediate_buffer_we</obj_property>
+         <obj_property name="ObjectShortName">intermediate_buffer_we</obj_property>
+      </wvobject>
+      <wvobject type="logic" fp_name="/tb_sign_top/DUT/\genblk1[1].KECCAK /dump_pipeline_stage/dump_stage_datapath/output_buffer_we">
+         <obj_property name="ElementShortName">output_buffer_we</obj_property>
+         <obj_property name="ObjectShortName">output_buffer_we</obj_property>
+      </wvobject>
+      <wvobject type="logic" fp_name="/tb_sign_top/DUT/genblk1[1].OLD_KECCAK/datapath_gen/wr_piso">
+         <obj_property name="ElementShortName">wr_piso</obj_property>
+         <obj_property name="ObjectShortName">wr_piso</obj_property>
+      </wvobject>
+      <wvobject type="logic" fp_name="/tb_sign_top/DUT/genblk1[1].OLD_KECCAK/datapath_gen/sel_piso">
+         <obj_property name="ElementShortName">sel_piso</obj_property>
+         <obj_property name="ObjectShortName">sel_piso</obj_property>
+      </wvobject>
+      <wvobject type="array" fp_name="/tb_sign_top/DUT/\genblk1[1].KECCAK /dump_pipeline_stage/dump_stage_fsm/current_state">
+         <obj_property name="ElementShortName">current_state[5:0]</obj_property>
+         <obj_property name="ObjectShortName">current_state[5:0]</obj_property>
          <obj_property name="CustomSignalColor">#FFD700</obj_property>
          <obj_property name="UseCustomSignalColor">true</obj_property>
       </wvobject>
-      <wvobject type="logic" fp_name="/tb_keygen_top/DUT/\genblk1[2].KECCAK /valid_out">
-         <obj_property name="ElementShortName">valid_out</obj_property>
-         <obj_property name="ObjectShortName">valid_out</obj_property>
-         <obj_property name="CustomSignalColor">#FF0000</obj_property>
+      <wvobject type="other" fp_name="/tb_sign_top/DUT/genblk1[1].OLD_KECCAK/control_gen/fsm3_gen/cstate_fsm3">
+         <obj_property name="ElementShortName">cstate_fsm3</obj_property>
+         <obj_property name="ObjectShortName">cstate_fsm3</obj_property>
+         <obj_property name="CustomSignalColor">#FFD700</obj_property>
          <obj_property name="UseCustomSignalColor">true</obj_property>
       </wvobject>
-      <wvobject type="array" fp_name="/tb_keygen_top/DUT/\genblk1[2].KECCAK /data_in">
-         <obj_property name="ElementShortName">data_in[63:0]</obj_property>
-         <obj_property name="ObjectShortName">data_in[63:0]</obj_property>
+      <wvobject type="array" fp_name="/tb_sign_top/DUT/\genblk1[1].KECCAK /dump_pipeline_stage/dump_stage_datapath/output_counter/counter">
+         <obj_property name="ElementShortName">counter[4:0]</obj_property>
+         <obj_property name="ObjectShortName">counter[4:0]</obj_property>
+         <obj_property name="Radix">UNSIGNEDDECRADIX</obj_property>
       </wvobject>
-      <wvobject type="array" fp_name="/tb_keygen_top/DUT/\genblk1[2].KECCAK /data_out">
-         <obj_property name="ElementShortName">data_out[63:0]</obj_property>
-         <obj_property name="ObjectShortName">data_out[63:0]</obj_property>
+      <wvobject type="array" fp_name="/tb_sign_top/DUT/\genblk1[1].KECCAK /dump_pipeline_stage/dump_stage_datapath/output_counter/_max_count">
+         <obj_property name="ElementShortName">_max_count[4:0]</obj_property>
+         <obj_property name="ObjectShortName">_max_count[4:0]</obj_property>
+         <obj_property name="Radix">UNSIGNEDDECRADIX</obj_property>
       </wvobject>
-      <wvobject type="logic" fp_name="/tb_keygen_top/DUT/same_dout[2]">
-         <obj_property name="ElementShortName">[2]</obj_property>
-         <obj_property name="ObjectShortName">[2]</obj_property>
+      <wvobject type="logic" fp_name="/tb_sign_top/DUT/\genblk1[1].KECCAK /dump_pipeline_stage/dump_stage_datapath/output_buffer/write_enable">
+         <obj_property name="ElementShortName">write_enable</obj_property>
+         <obj_property name="ObjectShortName">write_enable</obj_property>
       </wvobject>
-      <wvobject type="logic" fp_name="/tb_keygen_top/DUT/same_src_read[2]">
-         <obj_property name="ElementShortName">[2]</obj_property>
-         <obj_property name="ObjectShortName">[2]</obj_property>
+      <wvobject type="logic" fp_name="/tb_sign_top/DUT/\genblk1[1].KECCAK /dump_pipeline_stage/dump_stage_datapath/output_buffer/shift_enable">
+         <obj_property name="ElementShortName">shift_enable</obj_property>
+         <obj_property name="ObjectShortName">shift_enable</obj_property>
       </wvobject>
-      <wvobject type="logic" fp_name="/tb_keygen_top/DUT/same_dst_write[2]">
-         <obj_property name="ElementShortName">[2]</obj_property>
-         <obj_property name="ObjectShortName">[2]</obj_property>
+      <wvobject type="array" fp_name="/tb_sign_top/DUT/\genblk1[1].KECCAK /dump_pipeline_stage/dump_stage_datapath/output_buffer/data_in">
+         <obj_property name="ElementShortName">data_in[1343:0]</obj_property>
+         <obj_property name="ObjectShortName">data_in[1343:0]</obj_property>
       </wvobject>
-   </wvobject>
-   <wvobject type="group" fp_name="group764">
-      <obj_property name="label">old keccak2</obj_property>
-      <obj_property name="DisplayName">label</obj_property>
-      <obj_property name="isExpanded"></obj_property>
-   </wvobject>
-   <wvobject type="group" fp_name="group68">
-      <obj_property name="label">keccak0</obj_property>
-      <obj_property name="DisplayName">label</obj_property>
-      <wvobject type="array" fp_name="/tb_keygen_top/DUT/\genblk1[0].KECCAK /load_pipeline_stage/load_stage_fsm/current_state">
-         <obj_property name="ElementShortName">current_state[5:0]</obj_property>
-         <obj_property name="ObjectShortName">current_state[5:0]</obj_property>
-      </wvobject>
-      <wvobject type="array" fp_name="/tb_keygen_top/DUT/\genblk1[0].KECCAK /permute_pipeline_stage/permute_stage_fsm/current_state">
-         <obj_property name="ElementShortName">current_state[5:0]</obj_property>
-         <obj_property name="ObjectShortName">current_state[5:0]</obj_property>
-      </wvobject>
-      <wvobject type="array" fp_name="/tb_keygen_top/DUT/\genblk1[0].KECCAK /dump_pipeline_stage/dump_stage_fsm/current_state">
-         <obj_property name="ElementShortName">current_state[5:0]</obj_property>
-         <obj_property name="ObjectShortName">current_state[5:0]</obj_property>
-      </wvobject>
-      <wvobject type="group" fp_name="group197">
-         <obj_property name="label">load</obj_property>
-         <obj_property name="DisplayName">label</obj_property>
-         <wvobject type="logic" fp_name="/tb_keygen_top/DUT/\genblk1[0].KECCAK /load_pipeline_stage/load_stage_fsm/input_buffer_full">
-            <obj_property name="ElementShortName">input_buffer_full</obj_property>
-            <obj_property name="ObjectShortName">input_buffer_full</obj_property>
-            <obj_property name="CustomSignalColor">#FAAFBE</obj_property>
-            <obj_property name="UseCustomSignalColor">true</obj_property>
-         </wvobject>
-         <wvobject type="logic" fp_name="/tb_keygen_top/DUT/\genblk1[0].KECCAK /load_pipeline_stage/load_stage_datapath/control_regs_enable">
-            <obj_property name="ElementShortName">control_regs_enable</obj_property>
-            <obj_property name="ObjectShortName">control_regs_enable</obj_property>
-            <obj_property name="CustomSignalColor">#FAAFBE</obj_property>
-            <obj_property name="UseCustomSignalColor">true</obj_property>
-         </wvobject>
-         <wvobject type="logic" fp_name="/tb_keygen_top/DUT/\genblk1[0].KECCAK /load_pipeline_stage/load_stage_datapath/input_size_reached">
-            <obj_property name="ElementShortName">input_size_reached</obj_property>
-            <obj_property name="ObjectShortName">input_size_reached</obj_property>
-            <obj_property name="CustomSignalColor">#FAAFBE</obj_property>
-            <obj_property name="UseCustomSignalColor">true</obj_property>
-         </wvobject>
-         <wvobject type="logic" fp_name="/tb_keygen_top/DUT/\genblk1[0].KECCAK /load_pipeline_stage/load_stage_datapath/first_incomplete_input_word">
-            <obj_property name="ElementShortName">first_incomplete_input_word</obj_property>
-            <obj_property name="ObjectShortName">first_incomplete_input_word</obj_property>
-            <obj_property name="CustomSignalColor">#FAAFBE</obj_property>
-            <obj_property name="UseCustomSignalColor">true</obj_property>
-         </wvobject>
-         <wvobject type="logic" fp_name="/tb_keygen_top/DUT/\genblk1[0].KECCAK /load_pipeline_stage/load_stage_datapath/padding_enable">
-            <obj_property name="ElementShortName">padding_enable</obj_property>
-            <obj_property name="ObjectShortName">padding_enable</obj_property>
-            <obj_property name="CustomSignalColor">#FAAFBE</obj_property>
-            <obj_property name="UseCustomSignalColor">true</obj_property>
-         </wvobject>
-         <wvobject type="logic" fp_name="/tb_keygen_top/DUT/\genblk1[0].KECCAK /load_pipeline_stage/load_stage_fsm/input_counter_en">
-            <obj_property name="ElementShortName">input_counter_en</obj_property>
-            <obj_property name="ObjectShortName">input_counter_en</obj_property>
-            <obj_property name="CustomSignalColor">#FAAFBE</obj_property>
-            <obj_property name="UseCustomSignalColor">true</obj_property>
-         </wvobject>
-         <wvobject type="array" fp_name="/tb_keygen_top/DUT/\genblk1[0].KECCAK /load_pipeline_stage/load_stage_datapath/input_buffer_counter">
-            <obj_property name="ElementShortName">input_buffer_counter[4:0]</obj_property>
-            <obj_property name="ObjectShortName">input_buffer_counter[4:0]</obj_property>
-            <obj_property name="CustomSignalColor">#FAAFBE</obj_property>
-            <obj_property name="UseCustomSignalColor">true</obj_property>
-         </wvobject>
-         <wvobject type="array" fp_name="/tb_keygen_top/DUT/\genblk1[0].KECCAK /load_pipeline_stage/load_stage_datapath/input_size_counter">
-            <obj_property name="ElementShortName">input_size_counter[31:0]</obj_property>
-            <obj_property name="ObjectShortName">input_size_counter[31:0]</obj_property>
-            <obj_property name="CustomSignalColor">#FAAFBE</obj_property>
-            <obj_property name="UseCustomSignalColor">true</obj_property>
-         </wvobject>
-         <wvobject type="array" fp_name="/tb_keygen_top/DUT/\genblk1[0].KECCAK /load_pipeline_stage/load_stage_datapath/padding_gen/data_in">
-            <obj_property name="ElementShortName">data_in[63:0]</obj_property>
-            <obj_property name="ObjectShortName">data_in[63:0]</obj_property>
-         </wvobject>
-         <wvobject type="logic" fp_name="/tb_keygen_top/DUT/\genblk1[0].KECCAK /load_pipeline_stage/load_stage_datapath/padding_gen/first_pad_used">
-            <obj_property name="ElementShortName">first_pad_used</obj_property>
-            <obj_property name="ObjectShortName">first_pad_used</obj_property>
-         </wvobject>
-         <wvobject type="array" fp_name="/tb_keygen_top/DUT/\genblk1[0].KECCAK /load_pipeline_stage/load_stage_datapath/padding_gen/remaining_valid_bytes">
-            <obj_property name="ElementShortName">remaining_valid_bytes[3:0]</obj_property>
-            <obj_property name="ObjectShortName">remaining_valid_bytes[3:0]</obj_property>
-         </wvobject>
-         <wvobject type="array" fp_name="/tb_keygen_top/DUT/\genblk1[0].KECCAK /load_pipeline_stage/load_stage_datapath/padding_gen/first_pad_word_sel">
-            <obj_property name="ElementShortName">first_pad_word_sel[7:0]</obj_property>
-            <obj_property name="ObjectShortName">first_pad_word_sel[7:0]</obj_property>
-         </wvobject>
-         <wvobject type="array" fp_name="/tb_keygen_top/DUT/\genblk1[0].KECCAK /load_pipeline_stage/load_stage_datapath/padding_gen/padding_mask_sel">
-            <obj_property name="ElementShortName">padding_mask_sel[7:0]</obj_property>
-            <obj_property name="ObjectShortName">padding_mask_sel[7:0]</obj_property>
-         </wvobject>
-         <wvobject type="array" fp_name="/tb_keygen_top/DUT/\genblk1[0].KECCAK /load_pipeline_stage/load_stage_datapath/padding_gen/byte_pad">
-            <obj_property name="ElementShortName">byte_pad[7:0][7:0]</obj_property>
-            <obj_property name="ObjectShortName">byte_pad[7:0][7:0]</obj_property>
-         </wvobject>
-         <wvobject type="array" fp_name="/tb_keygen_top/DUT/\genblk1[0].KECCAK /load_pipeline_stage/load_stage_datapath/padding_gen/data_out">
-            <obj_property name="ElementShortName">data_out[63:0]</obj_property>
-            <obj_property name="ObjectShortName">data_out[63:0]</obj_property>
-         </wvobject>
-      </wvobject>
-      <wvobject type="array" fp_name="/tb_keygen_top/DUT/\genblk1[0].KECCAK /load_pipeline_stage/load_stage_datapath/input_buffer/buffer_data">
+      <wvobject type="array" fp_name="/tb_sign_top/DUT/\genblk1[1].KECCAK /dump_pipeline_stage/dump_stage_datapath/output_buffer/buffer_data">
          <obj_property name="ElementShortName">buffer_data[20:0][63:0]</obj_property>
          <obj_property name="ObjectShortName">buffer_data[20:0][63:0]</obj_property>
-         <obj_property name="CustomSignalColor">#E0FFFF</obj_property>
-         <obj_property name="UseCustomSignalColor">true</obj_property>
       </wvobject>
-      <wvobject type="group" fp_name="group325">
-         <obj_property name="label">permute</obj_property>
-         <obj_property name="DisplayName">label</obj_property>
-         <wvobject type="logic" fp_name="/tb_keygen_top/DUT/\genblk1[0].KECCAK /permute_pipeline_stage/permute_stage_datapath/absorb_enable">
-            <obj_property name="ElementShortName">absorb_enable</obj_property>
-            <obj_property name="ObjectShortName">absorb_enable</obj_property>
-         </wvobject>
-         <wvobject type="array" fp_name="/tb_keygen_top/DUT/\genblk1[0].KECCAK /permute_pipeline_stage/permute_stage_datapath/xor_mask">
-            <obj_property name="ElementShortName">xor_mask[1599:0]</obj_property>
-            <obj_property name="ObjectShortName">xor_mask[1599:0]</obj_property>
-         </wvobject>
-         <wvobject type="array" fp_name="/tb_keygen_top/DUT/\genblk1[0].KECCAK /permute_pipeline_stage/permute_stage_datapath/round_in">
-            <obj_property name="ElementShortName">round_in[1599:0]</obj_property>
-            <obj_property name="ObjectShortName">round_in[1599:0]</obj_property>
-         </wvobject>
-         <wvobject type="array" fp_name="/tb_keygen_top/DUT/\genblk1[0].KECCAK /permute_pipeline_stage/permute_stage_datapath/state_reg_in">
-            <obj_property name="ElementShortName">state_reg_in[1599:0]</obj_property>
-            <obj_property name="ObjectShortName">state_reg_in[1599:0]</obj_property>
-         </wvobject>
-         <wvobject type="array" fp_name="/tb_keygen_top/DUT/\genblk1[0].KECCAK /permute_pipeline_stage/permute_stage_datapath/state_reg_out">
-            <obj_property name="ElementShortName">state_reg_out[1599:0]</obj_property>
-            <obj_property name="ObjectShortName">state_reg_out[1599:0]</obj_property>
-         </wvobject>
-         <wvobject type="logic" fp_name="/tb_keygen_top/DUT/\genblk1[0].KECCAK /permute_pipeline_stage/permute_stage_datapath/round_en">
-            <obj_property name="ElementShortName">round_en</obj_property>
-            <obj_property name="ObjectShortName">round_en</obj_property>
-         </wvobject>
-         <wvobject type="array" fp_name="/tb_keygen_top/DUT/\genblk1[0].KECCAK /permute_pipeline_stage/permute_stage_datapath/round_num">
-            <obj_property name="ElementShortName">round_num[4:0]</obj_property>
-            <obj_property name="ObjectShortName">round_num[4:0]</obj_property>
-            <obj_property name="Radix">UNSIGNEDDECRADIX</obj_property>
-         </wvobject>
-      </wvobject>
-      <wvobject type="logic" fp_name="/tb_keygen_top/DUT/\genblk1[0].KECCAK /rst">
-         <obj_property name="ElementShortName">rst</obj_property>
-         <obj_property name="ObjectShortName">rst</obj_property>
-      </wvobject>
-      <wvobject type="logic" fp_name="/tb_keygen_top/DUT/\genblk1[0].KECCAK /valid_in">
-         <obj_property name="ElementShortName">valid_in</obj_property>
-         <obj_property name="ObjectShortName">valid_in</obj_property>
-         <obj_property name="CustomSignalColor">#00FFFF</obj_property>
-         <obj_property name="UseCustomSignalColor">true</obj_property>
-      </wvobject>
-      <wvobject type="logic" fp_name="/tb_keygen_top/DUT/\genblk1[0].KECCAK /ready_out">
-         <obj_property name="ElementShortName">ready_out</obj_property>
-         <obj_property name="ObjectShortName">ready_out</obj_property>
-         <obj_property name="CustomSignalColor">#FF00FF</obj_property>
-         <obj_property name="UseCustomSignalColor">true</obj_property>
-      </wvobject>
-      <wvobject type="logic" fp_name="/tb_keygen_top/DUT/\genblk1[0].KECCAK /ready_in">
-         <obj_property name="ElementShortName">ready_in</obj_property>
-         <obj_property name="ObjectShortName">ready_in</obj_property>
-         <obj_property name="CustomSignalColor">#FFD700</obj_property>
-         <obj_property name="UseCustomSignalColor">true</obj_property>
-      </wvobject>
-      <wvobject type="logic" fp_name="/tb_keygen_top/DUT/\genblk1[0].KECCAK /valid_out">
-         <obj_property name="ElementShortName">valid_out</obj_property>
-         <obj_property name="ObjectShortName">valid_out</obj_property>
-         <obj_property name="CustomSignalColor">#FF0000</obj_property>
-         <obj_property name="UseCustomSignalColor">true</obj_property>
-      </wvobject>
-      <wvobject type="array" fp_name="/tb_keygen_top/DUT/\genblk1[0].KECCAK /data_in">
-         <obj_property name="ElementShortName">data_in[63:0]</obj_property>
-         <obj_property name="ObjectShortName">data_in[63:0]</obj_property>
-      </wvobject>
-      <wvobject type="array" fp_name="/tb_keygen_top/DUT/\genblk1[0].KECCAK /data_out">
+      <wvobject type="array" fp_name="/tb_sign_top/DUT/\genblk1[1].KECCAK /data_out">
          <obj_property name="ElementShortName">data_out[63:0]</obj_property>
          <obj_property name="ObjectShortName">data_out[63:0]</obj_property>
       </wvobject>
-      <wvobject type="logic" fp_name="/tb_keygen_top/DUT/same_dout[0]">
-         <obj_property name="ElementShortName">[0]</obj_property>
-         <obj_property name="ObjectShortName">[0]</obj_property>
-      </wvobject>
-      <wvobject type="logic" fp_name="/tb_keygen_top/DUT/same_src_read[0]">
-         <obj_property name="ElementShortName">[0]</obj_property>
-         <obj_property name="ObjectShortName">[0]</obj_property>
-      </wvobject>
-      <wvobject type="logic" fp_name="/tb_keygen_top/DUT/same_dst_write[0]">
-         <obj_property name="ElementShortName">[0]</obj_property>
-         <obj_property name="ObjectShortName">[0]</obj_property>
+      <wvobject type="array" fp_name="/tb_sign_top/DUT/genblk1[1].OLD_KECCAK/dout">
+         <obj_property name="ElementShortName">dout[63:0]</obj_property>
+         <obj_property name="ObjectShortName">dout[63:0]</obj_property>
       </wvobject>
    </wvobject>
-   <wvobject type="group" fp_name="group77">
-      <obj_property name="label">keccak1</obj_property>
+   <wvobject type="array" fp_name="/tb_sign_top/DUT/\genblk1[1].KECCAK /load_pipeline_stage/load_stage_datapath/input_counter/_max_count">
+      <obj_property name="ElementShortName">_max_count[4:0]</obj_property>
+      <obj_property name="ObjectShortName">_max_count[4:0]</obj_property>
+      <obj_property name="Radix">UNSIGNEDDECRADIX</obj_property>
+   </wvobject>
+   <wvobject type="logic" fp_name="/tb_sign_top/DUT/\genblk1[1].KECCAK /load_pipeline_stage/load_stage_datapath/input_buffer_full">
+      <obj_property name="ElementShortName">input_buffer_full</obj_property>
+      <obj_property name="ObjectShortName">input_buffer_full</obj_property>
+   </wvobject>
+   <wvobject type="group" fp_name="group172">
+      <obj_property name="label">Keccak2</obj_property>
       <obj_property name="DisplayName">label</obj_property>
-      <wvobject type="logic" fp_name="/tb_keygen_top/DUT/\genblk1[1].KECCAK /rst">
-         <obj_property name="ElementShortName">rst</obj_property>
-         <obj_property name="ObjectShortName">rst</obj_property>
+      <obj_property name="isExpanded"></obj_property>
+      <wvobject type="logic" fp_name="/tb_sign_top/DUT/\genblk1[2].KECCAK /valid_in_internal">
+         <obj_property name="ElementShortName">valid_in_internal</obj_property>
+         <obj_property name="ObjectShortName">valid_in_internal</obj_property>
       </wvobject>
-      <wvobject type="logic" fp_name="/tb_keygen_top/DUT/\genblk1[1].KECCAK /valid_in">
-         <obj_property name="ElementShortName">valid_in</obj_property>
-         <obj_property name="ObjectShortName">valid_in</obj_property>
-         <obj_property name="CustomSignalColor">#00FFFF</obj_property>
-         <obj_property name="UseCustomSignalColor">true</obj_property>
+      <wvobject type="logic" fp_name="/tb_sign_top/DUT/\genblk1[2].KECCAK /ready_in_internal">
+         <obj_property name="ElementShortName">ready_in_internal</obj_property>
+         <obj_property name="ObjectShortName">ready_in_internal</obj_property>
       </wvobject>
-      <wvobject type="logic" fp_name="/tb_keygen_top/DUT/\genblk1[1].KECCAK /ready_out">
-         <obj_property name="ElementShortName">ready_out</obj_property>
-         <obj_property name="ObjectShortName">ready_out</obj_property>
-         <obj_property name="CustomSignalColor">#FF00FF</obj_property>
-         <obj_property name="UseCustomSignalColor">true</obj_property>
-      </wvobject>
-      <wvobject type="logic" fp_name="/tb_keygen_top/DUT/\genblk1[1].KECCAK /ready_in">
-         <obj_property name="ElementShortName">ready_in</obj_property>
-         <obj_property name="ObjectShortName">ready_in</obj_property>
-         <obj_property name="CustomSignalColor">#FFD700</obj_property>
-         <obj_property name="UseCustomSignalColor">true</obj_property>
-      </wvobject>
-      <wvobject type="logic" fp_name="/tb_keygen_top/DUT/\genblk1[1].KECCAK /valid_out">
-         <obj_property name="ElementShortName">valid_out</obj_property>
-         <obj_property name="ObjectShortName">valid_out</obj_property>
-         <obj_property name="CustomSignalColor">#FF0000</obj_property>
-         <obj_property name="UseCustomSignalColor">true</obj_property>
-      </wvobject>
-      <wvobject type="array" fp_name="/tb_keygen_top/DUT/\genblk1[1].KECCAK /data_in">
+      <wvobject type="array" fp_name="/tb_sign_top/DUT/\genblk1[2].KECCAK /data_in">
          <obj_property name="ElementShortName">data_in[63:0]</obj_property>
          <obj_property name="ObjectShortName">data_in[63:0]</obj_property>
       </wvobject>
-      <wvobject type="array" fp_name="/tb_keygen_top/DUT/\genblk1[1].KECCAK /data_out">
+      <wvobject type="array" fp_name="/tb_sign_top/DUT/\genblk1[2].KECCAK /load_pipeline_stage/load_stage_fsm/current_state">
+         <obj_property name="ElementShortName">current_state[5:0]</obj_property>
+         <obj_property name="ObjectShortName">current_state[5:0]</obj_property>
+         <obj_property name="CustomSignalColor">#FFD700</obj_property>
+         <obj_property name="UseCustomSignalColor">true</obj_property>
+      </wvobject>
+      <wvobject type="other" fp_name="/tb_sign_top/DUT/genblk1[2].OLD_KECCAK/control_gen/fsm1_gen/cstate_fsm1">
+         <obj_property name="ElementShortName">cstate_fsm1</obj_property>
+         <obj_property name="ObjectShortName">cstate_fsm1</obj_property>
+         <obj_property name="CustomSignalColor">#FFD700</obj_property>
+         <obj_property name="UseCustomSignalColor">true</obj_property>
+      </wvobject>
+      <wvobject type="array" fp_name="/tb_sign_top/DUT/\genblk1[2].KECCAK /permute_pipeline_stage/permute_stage_fsm/current_state">
+         <obj_property name="ElementShortName">current_state[5:0]</obj_property>
+         <obj_property name="ObjectShortName">current_state[5:0]</obj_property>
+         <obj_property name="CustomSignalColor">#FF00FF</obj_property>
+         <obj_property name="UseCustomSignalColor">true</obj_property>
+      </wvobject>
+      <wvobject type="other" fp_name="/tb_sign_top/DUT/genblk1[2].OLD_KECCAK/control_gen/fsm2_gen/cstate">
+         <obj_property name="ElementShortName">cstate</obj_property>
+         <obj_property name="ObjectShortName">cstate</obj_property>
+         <obj_property name="CustomSignalColor">#FF00FF</obj_property>
+         <obj_property name="UseCustomSignalColor">true</obj_property>
+      </wvobject>
+      <wvobject type="array" fp_name="/tb_sign_top/DUT/\genblk1[2].KECCAK /dump_pipeline_stage/dump_stage_fsm/current_state">
+         <obj_property name="ElementShortName">current_state[5:0]</obj_property>
+         <obj_property name="ObjectShortName">current_state[5:0]</obj_property>
+         <obj_property name="CustomSignalColor">#00FFFF</obj_property>
+         <obj_property name="UseCustomSignalColor">true</obj_property>
+      </wvobject>
+      <wvobject type="other" fp_name="/tb_sign_top/DUT/genblk1[2].OLD_KECCAK/control_gen/fsm3_gen/cstate_fsm3">
+         <obj_property name="ElementShortName">cstate_fsm3</obj_property>
+         <obj_property name="ObjectShortName">cstate_fsm3</obj_property>
+         <obj_property name="CustomSignalColor">#00FFFF</obj_property>
+         <obj_property name="UseCustomSignalColor">true</obj_property>
+      </wvobject>
+      <wvobject type="array" fp_name="/tb_sign_top/DUT/genblk1[2].OLD_KECCAK/dout">
+         <obj_property name="ElementShortName">dout[63:0]</obj_property>
+         <obj_property name="ObjectShortName">dout[63:0]</obj_property>
+      </wvobject>
+      <wvobject type="logic" fp_name="/tb_sign_top/DUT/genblk1[2].OLD_KECCAK/src_read">
+         <obj_property name="ElementShortName">src_read</obj_property>
+         <obj_property name="ObjectShortName">src_read</obj_property>
+      </wvobject>
+      <wvobject type="logic" fp_name="/tb_sign_top/DUT/genblk1[2].OLD_KECCAK/dst_write">
+         <obj_property name="ElementShortName">dst_write</obj_property>
+         <obj_property name="ObjectShortName">dst_write</obj_property>
+      </wvobject>
+      <wvobject type="array" fp_name="/tb_sign_top/DUT/\genblk1[2].KECCAK /data_out">
          <obj_property name="ElementShortName">data_out[63:0]</obj_property>
          <obj_property name="ObjectShortName">data_out[63:0]</obj_property>
       </wvobject>
-      <wvobject type="logic" fp_name="/tb_keygen_top/DUT/same_dout[1]">
-         <obj_property name="ElementShortName">[1]</obj_property>
-         <obj_property name="ObjectShortName">[1]</obj_property>
+      <wvobject type="logic" fp_name="/tb_sign_top/DUT/\genblk1[2].KECCAK /ready_out">
+         <obj_property name="ElementShortName">ready_out</obj_property>
+         <obj_property name="ObjectShortName">ready_out</obj_property>
       </wvobject>
-      <wvobject type="logic" fp_name="/tb_keygen_top/DUT/same_src_read[1]">
-         <obj_property name="ElementShortName">[1]</obj_property>
-         <obj_property name="ObjectShortName">[1]</obj_property>
+      <wvobject type="logic" fp_name="/tb_sign_top/DUT/\genblk1[2].KECCAK /valid_out">
+         <obj_property name="ElementShortName">valid_out</obj_property>
+         <obj_property name="ObjectShortName">valid_out</obj_property>
       </wvobject>
-      <wvobject type="logic" fp_name="/tb_keygen_top/DUT/same_dst_write[1]">
-         <obj_property name="ElementShortName">[1]</obj_property>
-         <obj_property name="ObjectShortName">[1]</obj_property>
+      <wvobject type="logic" fp_name="/tb_sign_top/DUT/\genblk1[2].KECCAK /rst">
+         <obj_property name="ElementShortName">rst</obj_property>
+         <obj_property name="ObjectShortName">rst</obj_property>
       </wvobject>
    </wvobject>
-   <wvobject type="array" fp_name="/tb_keygen_top/DUT/data_i">
-      <obj_property name="ElementShortName">data_i[63:0]</obj_property>
-      <obj_property name="ObjectShortName">data_i[63:0]</obj_property>
-   </wvobject>
-   <wvobject type="array" fp_name="/tb_keygen_top/data_o">
-      <obj_property name="ElementShortName">data_o[63:0]</obj_property>
-      <obj_property name="ObjectShortName">data_o[63:0]</obj_property>
-   </wvobject>
-   <wvobject type="logic" fp_name="/tb_keygen_top/DUT/valid_o">
-      <obj_property name="ElementShortName">valid_o</obj_property>
-      <obj_property name="ObjectShortName">valid_o</obj_property>
-   </wvobject>
-   <wvobject type="array" fp_name="/tb_keygen_top/state">
-      <obj_property name="ElementShortName">state[3:0]</obj_property>
-      <obj_property name="ObjectShortName">state[3:0]</obj_property>
-   </wvobject>
-   <wvobject type="array" fp_name="/tb_keygen_top/S_INIT">
-      <obj_property name="ElementShortName">S_INIT[3:0]</obj_property>
-      <obj_property name="ObjectShortName">S_INIT[3:0]</obj_property>
-   </wvobject>
-   <wvobject type="array" fp_name="/tb_keygen_top/S_START">
-      <obj_property name="ElementShortName">S_START[3:0]</obj_property>
-      <obj_property name="ObjectShortName">S_START[3:0]</obj_property>
-   </wvobject>
-   <wvobject type="array" fp_name="/tb_keygen_top/S_Z">
-      <obj_property name="ElementShortName">S_Z[3:0]</obj_property>
-      <obj_property name="ObjectShortName">S_Z[3:0]</obj_property>
-   </wvobject>
-   <wvobject type="array" fp_name="/tb_keygen_top/S_RHO">
-      <obj_property name="ElementShortName">S_RHO[3:0]</obj_property>
-      <obj_property name="ObjectShortName">S_RHO[3:0]</obj_property>
-   </wvobject>
-   <wvobject type="array" fp_name="/tb_keygen_top/S_K">
-      <obj_property name="ElementShortName">S_K[3:0]</obj_property>
-      <obj_property name="ObjectShortName">S_K[3:0]</obj_property>
-   </wvobject>
-   <wvobject type="array" fp_name="/tb_keygen_top/S_S1">
-      <obj_property name="ElementShortName">S_S1[3:0]</obj_property>
-      <obj_property name="ObjectShortName">S_S1[3:0]</obj_property>
-   </wvobject>
-   <wvobject type="array" fp_name="/tb_keygen_top/S_S2">
-      <obj_property name="ElementShortName">S_S2[3:0]</obj_property>
-      <obj_property name="ObjectShortName">S_S2[3:0]</obj_property>
-   </wvobject>
-   <wvobject type="array" fp_name="/tb_keygen_top/S_T1">
-      <obj_property name="ElementShortName">S_T1[3:0]</obj_property>
-      <obj_property name="ObjectShortName">S_T1[3:0]</obj_property>
-   </wvobject>
-   <wvobject type="array" fp_name="/tb_keygen_top/S_T0">
-      <obj_property name="ElementShortName">S_T0[3:0]</obj_property>
-      <obj_property name="ObjectShortName">S_T0[3:0]</obj_property>
-   </wvobject>
-   <wvobject type="array" fp_name="/tb_keygen_top/S_TR">
-      <obj_property name="ElementShortName">S_TR[3:0]</obj_property>
-      <obj_property name="ObjectShortName">S_TR[3:0]</obj_property>
-   </wvobject>
-   <wvobject type="array" fp_name="/tb_keygen_top/S_STALL">
-      <obj_property name="ElementShortName">S_STALL[3:0]</obj_property>
-      <obj_property name="ObjectShortName">S_STALL[3:0]</obj_property>
-   </wvobject>
-   <wvobject type="array" fp_name="/tb_keygen_top/S_STOP">
-      <obj_property name="ElementShortName">S_STOP[3:0]</obj_property>
-      <obj_property name="ObjectShortName">S_STOP[3:0]</obj_property>
+   <wvobject type="group" fp_name="group179">
+      <obj_property name="label">Dilithium</obj_property>
+      <obj_property name="DisplayName">label</obj_property>
+      <wvobject type="array" fp_name="/tb_sign_top/DUT/data_o">
+         <obj_property name="ElementShortName">data_o[63:0]</obj_property>
+         <obj_property name="ObjectShortName">data_o[63:0]</obj_property>
+      </wvobject>
+      <wvobject type="array" fp_name="/tb_sign_top/DUT/cstate0">
+         <obj_property name="ElementShortName">cstate0[4:0]</obj_property>
+         <obj_property name="ObjectShortName">cstate0[4:0]</obj_property>
+      </wvobject>
+      <wvobject type="array" fp_name="/tb_sign_top/DUT/cstate1">
+         <obj_property name="ElementShortName">cstate1[4:0]</obj_property>
+         <obj_property name="ObjectShortName">cstate1[4:0]</obj_property>
+      </wvobject>
+      <wvobject type="array" fp_name="/tb_sign_top/DUT/cstate2">
+         <obj_property name="ElementShortName">cstate2[4:0]</obj_property>
+         <obj_property name="ObjectShortName">cstate2[4:0]</obj_property>
+      </wvobject>
    </wvobject>
 </wave_config>

@@ -30,10 +30,10 @@
 module tb_sign_top;
     reg clk = 1,  rst = 1, start = 0;
   
-    reg [2:0] sec_lvl = 5;
+    reg [2:0] sec_lvl = 2;
     reg [1:0] mode = 2;
     
-    localparam NUM_TV = 1;
+    localparam NUM_TV = 2;
 
     reg valid_i,  ready_o;
     wire ready_i, valid_o;
@@ -506,7 +506,6 @@ module tb_sign_top;
                     ctr <= 0;
                     state <= START;
                     c <= c + 1;
-                    //$finish;
                     $display("SG3[%d] completed in %d clock cycles", c, ($time-start_time)/10);
 
                     if (c == NUM_TV-1) begin
