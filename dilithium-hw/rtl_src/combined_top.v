@@ -2372,6 +2372,7 @@ module combined_top #(
                 if (src_read[2]  && ~src_ready_fsm) begin
                     keccak_valid <= {keccak_valid[318:0], 1'b0};
                     keccak_fifo[0] <= 0;
+                    /*verilator unroll_full*/
                     for (i = 0; i < 319; i = i + 1)
                         keccak_fifo[i+1] <= keccak_fifo[i];
                 end
@@ -2382,6 +2383,7 @@ module combined_top #(
                 if (src_read[2]  && ~src_ready_fsm) begin
                     keccak_valid <= {keccak_valid[318:0], 1'b0};
                     keccak_fifo[0] <= 0;
+                    /*verilator unroll_full*/
                     for (i = 0; i < 319; i = i + 1)
                         keccak_fifo[i+1] <= keccak_fifo[i];
                 end

@@ -39,3 +39,32 @@ class PetaliteSimPlatform(SimPlatform):
     def __init__(self, io_path):
         io = load_io_from_json(json_path=io_path)
         SimPlatform.__init__(self, "SIM", io)
+
+    def add_dilithium_src(self, path):
+        # Force correct compilation order for Keccak
+        keccak_files = [
+            "shake-sv/keccak_pkg.sv",
+            "shake-sv/components/latch.sv",
+            "shake-sv/components/regn.sv",
+            "shake-sv/components/countern.sv",
+            "shake-sv/components/piso_buffer.sv",
+            "shake-sv/components/sipo_buffer.sv",
+            "shake-sv/components/sipo_buffer.sv",
+            "shake-sv/components/size_counter.sv",
+            "shake-sv/components/round_constant_gen.sv",
+            "shake-sv/components/round.sv",
+            "shake-sv/components/padding_gen.sv",
+            "shake-sv/stages/load_fsm.sv",
+            "shake-sv/stages/load_datapath.sv",
+            "shake-sv/stages/load_stage.sv",
+            "shake-sv/stages/permute_fsm.sv",
+            "shake-sv/stages/permute_datapath.sv",
+            "shake-sv/stages/permute_stage.sv",
+            "shake-sv/stages/dump_fsm.sv",
+            "shake-sv/stages/dump_datapath.sv",
+            "shake-sv/stages/dump_stage.sv",
+            "shake-sv/keccak.sv",
+        ]
+
+        self.add_sources(path, *keccak_files)
+        self.add_source_dir(path, recursive=False)
