@@ -1,8 +1,8 @@
 #!/bin/bash
 
 # === Configuration ===
-SRC_DIR="vhdl-sources"
-TOP_ENTITY="keccak_top"
+SRC_DIR="vhdl"
+TOP_ENTITY="clock_consumer"
 OUT_FILE="${TOP_ENTITY}.v"
 
 # === Collect VHDL file paths in correct order ===
