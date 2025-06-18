@@ -40,7 +40,7 @@ module tb_sign_top;
     reg  [63:0] data_i;  
     wire [63:0] data_o;
     
-    combined_top DUT (
+    dilithium DUT (
         clk,
         rst,
         start,
