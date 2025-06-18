@@ -1,6 +1,7 @@
 from litex.build.generic_platform import IOStandard, Pins, Subsignal
 from litex.build.sim import SimPlatform
 import json
+import os
 
 
 def load_io_from_json(json_path):
@@ -40,31 +41,35 @@ class PetaliteSimPlatform(SimPlatform):
         io = load_io_from_json(json_path=io_path)
         SimPlatform.__init__(self, "SIM", io)
 
-    def add_dilithium_src(self, path):
+    def add_dilithium_src(self, top_level_dir_path):
         # Force correct compilation order for Keccak
         keccak_files = [
-            "shake-sv/keccak_pkg.sv",
-            "shake-sv/components/latch.sv",
-            "shake-sv/components/regn.sv",
-            "shake-sv/components/countern.sv",
-            "shake-sv/components/piso_buffer.sv",
-            "shake-sv/components/sipo_buffer.sv",
-            "shake-sv/components/sipo_buffer.sv",
-            "shake-sv/components/size_counter.sv",
-            "shake-sv/components/round_constant_gen.sv",
-            "shake-sv/components/round.sv",
-            "shake-sv/components/padding_gen.sv",
-            "shake-sv/stages/load_fsm.sv",
-            "shake-sv/stages/load_datapath.sv",
-            "shake-sv/stages/load_stage.sv",
-            "shake-sv/stages/permute_fsm.sv",
-            "shake-sv/stages/permute_datapath.sv",
-            "shake-sv/stages/permute_stage.sv",
-            "shake-sv/stages/dump_fsm.sv",
-            "shake-sv/stages/dump_datapath.sv",
-            "shake-sv/stages/dump_stage.sv",
-            "shake-sv/keccak.sv",
+            "keccak_pkg.sv",
+            "components/latch.sv",
+            "components/regn.sv",
+            "components/countern.sv",
+            "components/piso_buffer.sv",
+            "components/sipo_buffer.sv",
+            "components/sipo_buffer.sv",
+            "components/size_counter.sv",
+            "components/round_constant_gen.sv",
+            "components/round.sv",
+            "components/padding_gen.sv",
+            "stages/load_fsm.sv",
+            "stages/load_datapath.sv",
+            "stages/load_stage.sv",
+            "stages/permute_fsm.sv",
+            "stages/permute_datapath.sv",
+            "stages/permute_stage.sv",
+            "stages/dump_fsm.sv",
+            "stages/dump_datapath.sv",
+            "stages/dump_stage.sv",
+            "keccak.sv",
         ]
 
-        self.add_sources(path, *keccak_files)
-        self.add_source_dir(path, recursive=False)
+        dilithium_components_path = os.path.join(top_level_dir_path, "rtl_src/")
+        keccak_components_path = os.path.join(dilithium_components_path, "shake-sv/")
+
+        self.add_sources(keccak_components_path, *keccak_files)
+        self.add_source_dir(dilithium_components_path, recursive=False)
+        self.add_source_dir(top_level_dir_path, recursive=False)

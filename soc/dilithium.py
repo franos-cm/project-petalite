@@ -4,19 +4,19 @@ from litex.soc.interconnect import stream
 
 class Dilithium(Module):
     def __init__(self):
-        self.sink = stream.Endpoint([("data", 64)])
-        self.source = stream.Endpoint([("data", 64)])
+        # AXI-Stream endpoints -------------------------------------------------
+        layout = [("data", 64)]
+        self.sink = stream.Endpoint(layout)  # input to RTL
+        self.source = stream.Endpoint(layout)  # output from RTL
 
+        # Control/CSR wires ----------------------------------------------------
         self.start = Signal()
         self.mode = Signal(2)
         self.sec_lvl = Signal(3)
 
+        # RTL instance ---------------------------------------------------------
         self.specials += Instance(
-            "combined_top",
-            # Params
-            p_BUS_W=4,
-            p_SAMPLE_W=23,
-            p_W=64,
+            "dilithium",
             # Control
             i_clk=ClockSignal(),
             i_rst=ResetSignal(),

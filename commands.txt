@@ -16,6 +16,13 @@ pip3 install litex/litex -- looks redundant but is necessary
 source /tools/Xilinx/Vivado/2024.2/settings64.sh
 
 
+-- Chipyard:
+1. Install conda
+2. Run sudo apt-get install linux-image-generic
+sudo apt install libguestfs-tools
+3. Run installation as per documentation
+4. source /home/franos/chipyard/env.sh
+
 
 -- Vivado
 sudo apt-get update
@@ -38,18 +45,6 @@ sudo meson setup build && cd build && meson install
 source /home/franos/projects/project-petalite/tools/oss-cad-suite/environment
 
 
--- Questa sim
-export PATH=$PATH:/home/franos/intelFPGA_pro/24.2/questa_fse/bin
-export LM_LICENSE_FILE=/home/franos/intelFPGA_pro/LR-236587_License.dat:$LM_LICENSE_FILE
-set ::env(LM_LICENSE_FILE)  "/home/franos/intelFPGA_pro/LR-LR-236587_License.dat"
-puts $::env(LM_LICENSE_FILE)
-
-
--- Verilator
-1. Follow tutorial in https://verilator.org/guide/latest/install.html, using Install into a Specific Prefix
-2. Then do export PATH="/tools/verilator/v5.036-48-g0dc93c1d5/bin:$PATH"
-
-
 -- To run QuestaSim in Vivado:
 1. Install the correct version of QuestaSim, which is 2024.1
 
@@ -67,8 +62,18 @@ around line 180, right at the end, or so.
 
 4. Wait for compilation (around 1:20h or so)
 
-5. set ::env(LM_LICENSE_FILE)  "/home/franos/intelFPGA_pro/LR-236507_License.dat"
+5. Set:
+export PATH=$PATH:/home/franos/intelFPGA_pro/24.2/questa_fse/bin
+export LM_LICENSE_FILE=/home/franos/intelFPGA_pro/LR-236507_License.dat:$LM_LICENSE_FILE
+::env(LM_LICENSE_FILE)  "/home/franos/intelFPGA_pro/LR-236507_License.dat"
 puts $::env(LM_LICENSE_FILE)
+
+
+-- Verilator
+1. Follow tutorial in https://verilator.org/guide/latest/install.html, using Install into a Specific Prefix
+2. Then do export PATH="/tools/verilator/v5.036-48-g0dc93c1d5/bin:$PATH"
+
+
 
 
 # Commands
@@ -77,6 +82,12 @@ export PATH="/tools/verilator/v5.036-48-g0dc93c1d5/bin:$PATH"
 ./soc/software/main.py --build-path=./build --mem=rom
 ./soc/soc.py --sim --compile-gateware --io-json=./soc/data/io_sim.json --firmware=firmware/firmware.bin --sys-clk-freq=1e6
 ./soc/soc.py --sim --compile-gateware --io-json=./soc/data/io_sim.json --firmware=firmware/firmware.bin --sys-clk-freq=1e6 --load
+
+./soc/soc.py --sim --compile-gateware --io-json=./soc/data/io_sim.json --firmware=build/software/bios/bios.bin --sys-clk-freq=1e6 --load
+gtkwave build/gateware/sim.fst
+
+litex_sim --cpu-type=rocket --cpu-variant=small --bus-data-width=64 --no-compile-gateware
+litex_sim --cpu-type=rocket --cpu-variant=small --bus-data-width=64 --rom-init=build/sim/software/bios/bios.bin
 
 
 -- Adding swap mem to SoC:
@@ -102,6 +113,8 @@ sudo ./install_drivers
 
 
 
+
+-- Litex:
 -- To simulate an arbitrary SoC, you do:
 if __name__ == "__main__":
     soc = MySoC()
