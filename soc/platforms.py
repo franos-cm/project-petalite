@@ -37,9 +37,10 @@ def load_io_from_json(json_path):
 
 
 class PetaliteSimPlatform(SimPlatform):
-    def __init__(self, io_path):
+    def __init__(self, io_path, rtl_dir_path):
         io = load_io_from_json(json_path=io_path)
         SimPlatform.__init__(self, "SIM", io)
+        self.add_dilithium_src(top_level_dir_path=rtl_dir_path)
 
     def add_dilithium_src(self, top_level_dir_path):
         # Force correct compilation order for Keccak

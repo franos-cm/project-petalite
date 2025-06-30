@@ -1,5 +1,18 @@
-import argparse
 import os
+import argparse
+from enum import StrEnum
+from typing import Tuple
+
+from litex.soc.interconnect import wishbone
+
+
+class CoreType(StrEnum):
+    EMBEDDED = "EMBEDDED"
+    PCIE_DEVICE = "PCIE_DEVICE"
+    HOST = "HOST"
+
+
+HostBusInterfaces = Tuple[wishbone.Interface, wishbone.Interface]
 
 
 def str_to_int(s):
@@ -14,19 +27,98 @@ def str_to_int(s):
     return int(f)
 
 
-def arg_parser():
+def host_arg_parser():
     parser = argparse.ArgumentParser(description="Project Petalite SoC")
+
     parser.add_argument(
         "--sys-clk-freq",
         type=str_to_int,
         default=1e8,
         help="System clock frequency",
     )
+
     parser.add_argument(
-        "--comm",
+        "--load",
+        action="store_true",
+        default=False,
+        help="Either load the bitstream or run the simulation.",
+    )
+
+    parser.add_argument(
+        "--compile-gateware",
+        action="store_true",
+        default=False,
+        help="Only build the gateware.",
+    )
+
+    parser.add_argument(
+        "--sim",
+        action="store_true",
+        default=False,
+        help="Build for simulation or real board",
+    )
+
+    parser.add_argument(
+        "--io-json",
         type=str,
-        default="uart",
+        help="Path to the io json config. Required for a simulated platform.",
+    )
+
+    parser.add_argument(
+        "--host-firmware",
+        type=str,
+        help="Path to the firmware binary file. Required if --load is set.",
+    )
+
+    parser.add_argument(
+        "--petalite-firmware",
+        type=str,
+        help="Path to the firmware binary file. Required if --load is set.",
+    )
+
+    parser.add_argument(
+        "--rtl-dir-path",
+        type=str,
+        default="./dilithium-hw",
+        help="Directory path for custom cores",
+    )
+    parser.add_argument(
+        "--build-dir",
+        type=str,
+        default="./build",
+        help="Path to the build dir.",
+    )
+    parser.add_argument(
+        "--debug",
+        action="store_true",
+        default=False,
+        help="Generate waveforms or not.",
+    )
+
+    args = parser.parse_args()
+    print(args.sim)
+    if args.sim and not args.io_json:
+        parser.error("Simulated platform requires a pin map json.")
+    if args.load and not (args.host_firmware and args.petalite_firmware):
+        parser.error("Loading requires firmware binary.")
+
+    return args
+
+
+def petalite_arg_parser():
+    parser = argparse.ArgumentParser(description="Project Petalite SoC")
+
+    parser.add_argument(
+        "--type",
+        type=CoreType,
+        default=CoreType.HOST,
         help="Communication protocol",
+    )
+    parser.add_argument(
+        "--sys-clk-freq",
+        type=str_to_int,
+        default=1e8,
+        help="System clock frequency",
     )
 
     parser.add_argument(
@@ -69,6 +161,12 @@ def arg_parser():
         type=str,
         default="./build",
         help="Path to the build dir.",
+    )
+    parser.add_argument(
+        "--debug",
+        action="store_true",
+        default=False,
+        help="Generate waveforms or not.",
     )
 
     args = parser.parse_args()
