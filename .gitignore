@@ -1,7 +1,6 @@
 venv
 tools
 build
-firmware
 *.jou
 *.log
 *.str

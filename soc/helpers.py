@@ -45,6 +45,13 @@ def host_arg_parser():
     )
 
     parser.add_argument(
+        "--compile-petalite-software",
+        action="store_true",
+        default=False,
+        help="Compile petalite software.",
+    )
+
+    parser.add_argument(
         "--compile-gateware",
         action="store_true",
         default=False,
@@ -96,11 +103,14 @@ def host_arg_parser():
     )
 
     args = parser.parse_args()
-    print(args.sim)
     if args.sim and not args.io_json:
         parser.error("Simulated platform requires a pin map json.")
-    if args.load and not (args.host_firmware and args.petalite_firmware):
-        parser.error("Loading requires firmware binary.")
+    if args.compile_petalite_software and not args.io_json:
+        parser.error("Simulated platform requires a pin map json.")
+    if args.load and (not (args.host_firmware and args.petalite_firmware)):
+        parser.error("Loading requires firmware binary")
+    if args.load and args.compile_petalite_software:
+        parser.error("Cannot load and compile petalite software on same step.")
 
     return args
 

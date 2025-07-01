@@ -1,3 +1,4 @@
+#!/usr/bin/env python3
 from typing import Optional
 
 from migen import ClockDomain, Instance
@@ -84,7 +85,7 @@ class PetaliteCore(SoCCore):
 
     def setup_clk(self: SoCCore):
         if self.core_type == CoreType.EMBEDDED:
-            self.clock_domains.cd_sys = ClockDomain("petalite_sys")
+            self.clock_domains.cd_sys = ClockDomain("sys")
         elif self.is_simulated:
             self.crg = CRG(self.platform.request("sys_clk"))
 
