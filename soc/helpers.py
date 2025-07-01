@@ -92,7 +92,7 @@ def host_arg_parser():
     parser.add_argument(
         "--build-dir",
         type=str,
-        default="./build",
+        default="./build-soc",
         help="Path to the build dir.",
     )
     parser.add_argument(
@@ -169,7 +169,7 @@ def petalite_arg_parser():
     parser.add_argument(
         "--build-dir",
         type=str,
-        default="./build",
+        default="./build-soc",
         help="Path to the build dir.",
     )
     parser.add_argument(

@@ -89,35 +89,35 @@ static void reboot_cmd(void)
 
 static void send_command(uint32_t value)
 {
-	petalite_cmd_value_write(value);
-	petalite_cmd_valid_write(1);
+	petalite_main_cmd_value_write(value);
+	petalite_main_cmd_valid_write(1);
 
-	// Wait for Petalite to acknowledge
-	while (!petalite_cmd_ack_read())
+	// Wait for petalite_main to acknowledge
+	while (!petalite_main_cmd_ack_read())
 		;
 
 	// Clear valid
-	petalite_cmd_valid_write(0);
+	petalite_main_cmd_valid_write(0);
 
-	// Wait for Petalite to clear ack
-	while (petalite_cmd_ack_read())
+	// Wait for petalite_main to clear ack
+	while (petalite_main_cmd_ack_read())
 		;
 }
 
 static uint32_t receive_response(void)
 {
 	// Wait for valid response
-	while (!petalite_rsp_valid_read())
+	while (!petalite_main_rsp_valid_read())
 		;
 
-	uint32_t response = petalite_rsp_value_read();
+	uint32_t response = petalite_main_rsp_value_read();
 	printf("Host received response: %u\n", response);
 
-	// Acknowledge and wait for Petalite to clear
-	petalite_rsp_ack_write(1);
-	while (petalite_rsp_valid_read())
+	// Acknowledge and wait for petalite_main to clear
+	petalite_main_rsp_ack_write(1);
+	while (petalite_main_rsp_valid_read())
 		;
-	petalite_rsp_ack_write(0);
+	petalite_main_rsp_ack_write(0);
 
 	return response;
 }

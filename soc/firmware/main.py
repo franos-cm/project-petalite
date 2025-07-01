@@ -2,6 +2,7 @@
 
 import os
 import sys
+import shutil
 import argparse
 from litex.build.tools import replace_in_file
 
@@ -9,18 +10,21 @@ from litex.build.tools import replace_in_file
 def main():
     parser = argparse.ArgumentParser(description="LiteX Bare Metal App Builder.")
     parser.add_argument(
+        "--src-dir",
+        help="Source directory to compile, relative to soc/firmware/.",
+    )
+    parser.add_argument(
         "--build-path",
         required=True,
         help="Target's build path (e.g., build/board_name).",
     )
     parser.add_argument(
         "--output-dir",
-        default="firmware",
+        default="build-firmware",
         help="Output directory for build files (default: firmware/).",
     )
     parser.add_argument(
         "--firmware-name",
-        default="firmware",
         help="Name of the firmware binary (without extension, e.g., petalite_firmware).",
     )
     parser.add_argument("--with-cxx", action="store_true", help="Enable CXX support.")
@@ -54,7 +58,9 @@ def main():
     )
 
     os.system(
-        f"export BUILD_DIR={build_path} FIRMWARE_NAME={args.firmware_name} && {'export WITH_CXX=1 &&' if args.with_cxx else ''} cd {args.output_dir} && make"
+        f"export BUILD_DIR={build_path} FIRMWARE_NAME={args.firmware_name} "
+        f"SRC_DIR={args.src_dir} && {'export WITH_CXX=1 &&' if args.with_cxx else ''} "
+        f"cd {args.output_dir} && make"
     )
 
     # Rename and copy the binary output
@@ -83,6 +89,8 @@ def main():
             filepath = os.path.join(args.output_dir, filename)
             if os.path.isfile(filepath):
                 os.remove(filepath)
+            elif os.path.isdir(filepath):
+                shutil.rmtree(filepath)
 
 
 if __name__ == "__main__":

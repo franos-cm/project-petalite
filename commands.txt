@@ -79,8 +79,9 @@ puts $::env(LM_LICENSE_FILE)
 # Commands
 export PATH="/tools/verilator/v5.036-48-g0dc93c1d5/bin:$PATH"
 ./soc/host.py --sim --io-json=./soc/data/io_sim.json --compile-petalite-software
-./soc/firmware/main.py --build-path=./build --mem=rom
-./soc/firmware/main.py --build-path=./build --mem=rom --firmware-name=host_firmware --output-dir=host_firmware
+./soc/firmware/main.py --src-dir=host --build-path=./build-soc/host --output-dir=build-firmware-host --firmware-name=firmware --mem=rom
+./soc/firmware/main.py --src-dir=petalite --build-path=./build-soc/petalite --output-dir=build-firmware-petalite --firmware-name=firmware --mem=rom
+
 
 ./soc/soc.py --sim --compile-gateware --io-json=./soc/data/io_sim.json --firmware=firmware/firmware.bin --sys-clk-freq=1e6
 ./soc/soc.py --sim --compile-gateware --io-json=./soc/data/io_sim.json --firmware=firmware/firmware.bin --sys-clk-freq=1e6 --load
