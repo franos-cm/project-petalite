@@ -150,7 +150,7 @@ module dilithium_adapter #(
                 output_size = 'd932;
         else if (mode == 2'd1)
             output_size = 'd1;
-        else (mode == 2'd2)
+        else
             if (sec_lvl == 3'd2)
                 output_size = 'd303;
             else if (sec_lvl == 3'd3)
