@@ -1,5 +1,11 @@
 import argparse
 import os
+from enum import StrEnum
+
+
+class CommProtocol(StrEnum):
+    UART = "UART"
+    PCIE = "PCIE"
 
 
 def str_to_int(s):
@@ -22,13 +28,6 @@ def arg_parser():
         default=1e8,
         help="System clock frequency",
     )
-    parser.add_argument(
-        "--comm",
-        type=str,
-        default="uart",
-        help="Communication protocol",
-    )
-
     parser.add_argument(
         "--load",
         action="store_true",
@@ -67,8 +66,23 @@ def arg_parser():
     parser.add_argument(
         "--build-dir",
         type=str,
-        default="./build",
+        default="./build-soc",
         help="Path to the build dir.",
+    )
+
+    parser.add_argument(
+        "--comm",
+        type=lambda s: CommProtocol(s.upper()),
+        choices=list(CommProtocol),
+        default=CommProtocol.UART,
+        help="Communication protocol (UART or PCIE).",
+    )
+
+    parser.add_argument(
+        "--trace",
+        action="store_true",
+        default=False,
+        help="Generate waveforms or not.",
     )
 
     args = parser.parse_args()

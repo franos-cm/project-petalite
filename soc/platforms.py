@@ -37,9 +37,10 @@ def load_io_from_json(json_path):
 
 
 class PetaliteSimPlatform(SimPlatform):
-    def __init__(self, io_path):
+    def __init__(self, io_path, rtl_dir_path):
         io = load_io_from_json(json_path=io_path)
         SimPlatform.__init__(self, "SIM", io)
+        self.add_dilithium_src(top_level_dir_path=rtl_dir_path)
 
     def add_dilithium_src(self, top_level_dir_path):
         # Force correct compilation order for Keccak
@@ -67,7 +68,7 @@ class PetaliteSimPlatform(SimPlatform):
             "keccak.sv",
         ]
 
-        dilithium_components_path = os.path.join(top_level_dir_path, "rtl_src/")
+        dilithium_components_path = os.path.join(top_level_dir_path, "components/")
         keccak_components_path = os.path.join(dilithium_components_path, "shake-sv/")
 
         self.add_sources(keccak_components_path, *keccak_files)

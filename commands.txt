@@ -1,3 +1,6 @@
+## TODO
+Remember to check all prints Ive added to Litex build, since some of them change stuff (like rom loading)
+
 -- Starting litex
 mkdir project-petalite
 cd project-petalite
@@ -78,7 +81,10 @@ puts $::env(LM_LICENSE_FILE)
 
 # Commands
 export PATH="/tools/verilator/v5.036-48-g0dc93c1d5/bin:$PATH"
-./soc/soc.py --sim --io-json=./soc/data/io_sim.json
+./soc/petalite.py --sim --io-json=./soc/data/io_sim.json
+./soc/firmware/main.py  --build-path=./build-soc --output-dir=build-firmware --firmware-name=firmware --mem=rom
+./soc/petalite.py --sim --compile-gateware --io-json=./soc/data/io_sim.json --firmware=build-firmware/firmware.bin --sys-clk-freq=1e6 --load
+
 ./soc/software/main.py --build-path=./build --mem=rom
 ./soc/soc.py --sim --compile-gateware --io-json=./soc/data/io_sim.json --firmware=firmware/firmware.bin --sys-clk-freq=1e6
 ./soc/soc.py --sim --compile-gateware --io-json=./soc/data/io_sim.json --firmware=firmware/firmware.bin --sys-clk-freq=1e6 --load

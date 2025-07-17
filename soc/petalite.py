@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 from migen.genlib.io import CRG
 
-from litex.soc.cores import dna
+from litex.soc.cores.dna import DNA
 from litex.soc.cores.dma import WishboneDMAReader, WishboneDMAWriter
 from litex.soc.integration.builder import Builder
 from litex.soc.integration.soc_core import SoCCore
@@ -12,69 +12,79 @@ from litex.build.sim import SimPlatform
 from litex.build.sim.config import SimConfig
 from litex.build.generic_platform import GenericPlatform
 
+from liteeth.phy.model import LiteEthPHYModel
+from liteeth.common import convert_ip
+
 from dilithium import Dilithium
-from fpga_platform import PetaliteSimPlatform
-from utils import arg_parser, generate_gtkw_savefile
+from platforms import PetaliteSimPlatform
+from helpers import arg_parser, generate_gtkw_savefile, CommProtocol
 
 
-class ProjectPetalite(SoCCore):
+class PetaliteCore(SoCCore):
+    is_simulated: bool
+
     def __init__(
         self,
+        comm_protocol: CommProtocol,
         platform: GenericPlatform,
         sys_clk_freq: int,
-        comm_protocol: str,
-        integrated_rom_init: str = None,
+        integrated_rom_init: str | list = [],
+        clk_domain_name: str = None,
+        trace: bool = False,
     ):
+        self.platform_instance = platform
+        self.is_simulated = isinstance(platform, SimPlatform)
+        self.clk_domain_name = clk_domain_name
+        self.comm_protocol = comm_protocol
 
         # SoC with CPU
         SoCCore.__init__(
             self,
             # System specs
             platform,
-            ident="Project Petalite",
+            ident="Petalite Core",
             ident_version=True,
             # CPU specs
-            # cpu_type="vexriscv",
-            # cpu_variant="standard",
-            # For now, necessary since its 64 bits
             cpu_type="rocket",
             cpu_variant="small",
             bus_data_width=64,
             clk_freq=sys_clk_freq,
-            # Communication with terminal
+            # Communication
             with_uart=False,
             # Memory specs
-            integrated_rom_size=131072,
-            integrated_sram_size=8192,
-            integrated_rom_init=integrated_rom_init if integrated_rom_init else [],
+            integrated_rom_size=0x20000,
+            integrated_sram_size=0x2000,
+            integrated_rom_init=integrated_rom_init,
             # integrated_main_ram_size=0x1_0000,  # TODO: cant use main_ram because of SBI...
         )
-        self.is_simulated = isinstance(platform, SimPlatform)
-        with_dram = self.integrated_main_ram_size == 0
 
-        # CRG ---------------------------------------------------
-        if not self.is_simulated:
-            pass
-        else:
-            self.crg = CRG(platform.request("sys_clk"))
-
-        # FPGA identification -----------------------------------
-        if not self.is_simulated:
-            self.submodules.dna = dna.DNA()
-            self.add_csr("dna")
-
-        self.comb += platform.trace.eq(1)
-        self.add_comm_capability(comm_protocol=comm_protocol)
+        self.setup_clk()
+        self.add_id()
+        self.add_io()
         self.add_dilithium()
 
-    def add_comm_capability(self: SoCCore, comm_protocol: str):
-        if comm_protocol == "uart":
+        if trace:
+            self.comb += self.platform_instance.trace.eq(1)
+
+    def setup_clk(self: SoCCore):
+        if self.is_simulated:
+            self.crg = CRG(self.platform_instance.request("sys_clk"))
+
+    def add_id(self: SoCCore):
+        if not self.is_simulated:
+            self.submodules.dna = DNA()
+            self.add_csr("dna")
+
+    def add_io(self: SoCCore):
+        if self.comm_protocol == CommProtocol.PCIE:
+            pass
+        elif self.comm_protocol == CommProtocol.UART:
             if self.is_simulated:
                 self.add_uart(uart_name="sim")
             else:
                 self.add_uart(uart_name="serial")
-        elif comm_protocol == "pcie":
-            pass
+        else:
+            raise RuntimeError()
 
     def add_dilithium(self: SoCCore):
         # Add bus masters
@@ -113,21 +123,42 @@ class ProjectPetalite(SoCCore):
             self.dilithium.sec_lvl.eq(self.sec_lvl.storage),
         ]
 
+    def add_etherbone_bridge(self: SoCCore):
+        self.ethphy = LiteEthPHYModel(self.platform.request("eth", 0))
+        self.add_constant("HW_PREAMBLE_CRC")
+
+        self.add_etherbone(
+            phy=self.ethphy,
+            # Etherbone Parameters.
+            ip_address=convert_ip("192.168.1.50"),
+            mac_address=0x10E2D5000001,
+            data_width=8,
+            # Ethernet Parameters.
+            with_ethmac=False,
+            ethmac_address=0x10E2D5000000,
+            ethmac_local_ip="192.168.1.50",
+            ethmac_remote_ip="192.168.1.100",
+        )
+
 
 def main():
     # TODO: check LitePCIeSoC
     args = arg_parser()
 
     # Platform definition
-    platform = PetaliteSimPlatform(io_path=args.io_json) if args.sim else None
-    platform.add_dilithium_src(top_level_dir_path=args.rtl_dir_path)
+    platform = (
+        PetaliteSimPlatform(io_path=args.io_json, rtl_dir_path=args.rtl_dir_path)
+        if args.sim
+        else None
+    )
 
     # SoC definition
-    soc = ProjectPetalite(
+    soc = PetaliteCore(
         platform=platform,
         sys_clk_freq=args.sys_clk_freq,
         comm_protocol=args.comm,
         integrated_rom_init=args.firmware,
+        trace=args.trace,
     )
 
     # Building stage
@@ -138,22 +169,20 @@ def main():
     if args.sim:
         sim_config = SimConfig()
         sim_config.add_clocker("sys_clk", freq_hz=args.sys_clk_freq)
-        if args.comm == "uart":
+        if args.comm == CommProtocol.UART:
             sim_config.add_module("serial2console", "serial")
-        elif args.comm == "pcie":
-            pass
-
-        def pre_run_callback(vns):
-            generate_gtkw_savefile(builder, vns, True)
 
         builder.build(
             run=args.load,
             sim_config=sim_config,
             interactive=False,
-            pre_run_callback=pre_run_callback,
-            # Turn this into a param
-            trace=True,
-            trace_fst=True,
+            pre_run_callback=(
+                (lambda vns: generate_gtkw_savefile(builder, vns, True))
+                if args.trace
+                else None
+            ),
+            trace=args.trace,
+            trace_fst=args.trace,
         )
 
     else:

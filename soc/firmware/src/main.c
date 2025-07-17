@@ -1,6 +1,3 @@
-// This file is Copyright (c) 2020 Florent Kermarrec <florent@enjoy-digital.fr>
-// License: BSD
-
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -75,7 +72,7 @@ static char *get_token(char **str)
 
 static void prompt(void)
 {
-	printf("\e[92;1mlitex-demo-app\e[0m> ");
+	printf("\e[92;1mpetalite\e[0m> ");
 }
 
 /*-----------------------------------------------------------------------*/
@@ -84,7 +81,7 @@ static void prompt(void)
 
 static void help(void)
 {
-	puts("\nLiteX minimal demo app built " __DATE__
+	puts("\nProject Petalite, built " __DATE__
 		 " " __TIME__
 		 "\n");
 }
@@ -96,13 +93,6 @@ static void help(void)
 static void reboot_cmd(void)
 {
 	ctrl_reset_write(1);
-}
-
-extern void helloc(void);
-static void helloc_cmd(void)
-{
-	printf("Hello C demo...\n");
-	helloc();
 }
 
 /*---------------------------------------------------------------------*/
@@ -202,8 +192,6 @@ static void console_service(void)
 		help();
 	else if (strcmp(token, "reboot") == 0)
 		reboot_cmd();
-	else if (strcmp(token, "helloc") == 0)
-		helloc_cmd();
 	else if (strcmp(token, "dilithium") == 0)
 		dilithium_demo_cmd();
 	prompt();
@@ -220,11 +208,6 @@ int main(void)
 	help();
 	dilithium_demo_cmd();
 	prompt();
-
-	// while (1)
-	// {
-
-	// }
 
 	return 0;
 }
