@@ -56,29 +56,23 @@ endmodule
 
 module edge_detector (
     input  logic clk,
-    input  logic rst,
     input  logic signal_in,
-    output logic rising_edge
+    output logic rising_edge,
+    output logic falling_edge
 );
-    // Internal register to store the previous state of the input signal
-    logic signal_prev;
+    logic prev_signal;
 
-    // Edge detection logic
-    always_ff @(posedge clk or posedge rst) begin
-        if (rst) begin
-            signal_prev  <= 1'b0;
-            rising_edge  <= 1'b0;
-        end else begin
-            // A rising edge occurs if current is 1 and previous is 0
-            rising_edge  <= (signal_in & ~signal_prev);
-            signal_prev  <= signal_in;
-        end
+    always_ff @(posedge clk) begin
+        prev_signal <= signal_in;
     end
+
+    assign rising_edge = signal_in & ~prev_signal;
+    assign falling_edge = (~signal_in) & prev_signal;
 
 endmodule
 
 
-module stream_adapter #(
+module dilithium_adapter #(
     parameter w = 64
 ) (
     input  logic              clk,
@@ -156,7 +150,7 @@ module stream_adapter #(
                 output_size = 'd932;
         else if (mode == 2'd1)
             output_size = 'd1;
-        if (mode == 2'd2)
+        else (mode == 2'd2)
             if (sec_lvl == 3'd2)
                 output_size = 'd303;
             else if (sec_lvl == 3'd3)

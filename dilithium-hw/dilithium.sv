@@ -25,7 +25,7 @@ module dilithium (
         .rising_edge(start_strobe)
     );
 
-    stream_adapter adapter (
+    dilithium_adapter adapter (
         .clk     (clk),
         .rst     (rst),
         .start   (start_strobe),
