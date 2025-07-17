@@ -1,0 +1,57 @@
+#include <stdint.h>
+
+#define DILITHIUM_PK_LVL2_SIZE 0x5000
+#define DILITHIUM_PK_LVL3_SIZE 0x5000
+#define DILITHIUM_PK_LVL5_SIZE 0x5000
+
+#define DILITHIUM_SK_LVL2_SIZE 0x5000
+#define DILITHIUM_SK_LVL3_SIZE 0x5000
+#define DILITHIUM_SK_LVL5_SIZE 0x5000
+
+#define DILITHIUM_SIG_LVL2_SIZE 0x5000
+#define DILITHIUM_SIG_LVL3_SIZE 0x5000
+#define DILITHIUM_SIG_LVL5_SIZE 0x5000
+
+#define DILITHIUM_C_LVL2_SIZE 0x5000
+#define DILITHIUM_C_LVL3_SIZE 0x5000
+#define DILITHIUM_C_LVL5_SIZE 0x5000
+
+#define DILITHIUM_H_LVL2_SIZE 0x5000
+#define DILITHIUM_H_LVL3_SIZE 0x5000
+#define DILITHIUM_H_LVL5_SIZE 0x5000
+
+#define DILITHIUM_S1_LVL2_SIZE 0x5000
+#define DILITHIUM_S1_LVL3_SIZE 0x5000
+#define DILITHIUM_S1_LVL5_SIZE 0x5000
+
+#define DILITHIUM_S2_LVL2_SIZE 0x5000
+#define DILITHIUM_S2_LVL3_SIZE 0x5000
+#define DILITHIUM_S2_LVL5_SIZE 0x5000
+
+#define DILITHIUM_T0_LVL2_SIZE 0x5000
+#define DILITHIUM_T0_LVL3_SIZE 0x5000
+#define DILITHIUM_T0_LVL5_SIZE 0x5000
+
+#define DILITHIUM_T1_LVL2_SIZE 0x5000
+#define DILITHIUM_T1_LVL3_SIZE 0x5000
+#define DILITHIUM_T1_LVL5_SIZE 0x5000
+
+#define DILITHIUM_TR_LVL2_SIZE 0x5000
+#define DILITHIUM_TR_LVL3_SIZE 0x5000
+#define DILITHIUM_TR_LVL5_SIZE 0x5000
+
+#define DILITHIUM_Z_LVL2_SIZE 0x5000
+#define DILITHIUM_Z_LVL3_SIZE 0x5000
+#define DILITHIUM_Z_LVL5_SIZE 0x5000
+
+#define DILITHIUM_K_SIZE 0x5000
+#define DILITHIUM_RHO_SIZE 0x5000
+
+static int get_sig_len(uint8_t lvl);
+static int get_pk_len(uint8_t lvl);
+static int get_sk_len(uint8_t lvl);
+static int get_c_len(uint8_t lvl);
+static int get_z_len(uint8_t lvl);
+static int get_t1_len(uint8_t lvl);
+static int get_t0_len(uint8_t lvl);
+static int get_h_len(uint8_t lvl);
