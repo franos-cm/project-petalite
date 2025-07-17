@@ -78,9 +78,35 @@ puts $::env(LM_LICENSE_FILE)
 
 # Commands
 export PATH="/tools/verilator/v5.036-48-g0dc93c1d5/bin:$PATH"
-./soc/host.py --sim --io-json=./soc/data/io_sim.json --compile-petalite-software
-./soc/firmware/main.py --src-dir=host --build-path=./build-soc/host --output-dir=build-firmware-host --firmware-name=firmware --mem=rom
+./soc/host.py --sim --io-json=./soc/data/io_sim.json --compile-petalite-software --debug-bridge
 ./soc/firmware/main.py --src-dir=petalite --build-path=./build-soc/petalite --output-dir=build-firmware-petalite --firmware-name=firmware --mem=rom
+./soc/host.py --sim --compile-gateware --io-json=./soc/data/io_sim.json --petalite-firmware=build-firmware-petalite/firmware.bin --sys-clk-freq=1e6 --debug-bridge
+./soc/firmware/main.py --src-dir=host --build-path=./build-soc/host --output-dir=build-firmware-host --firmware-name=firmware --mem=rom
+./soc/host.py --sim --compile-gateware --io-json=./soc/data/io_sim.json --host-firmware=build-firmware-host/firmware.bin --petalite-firmware=build-firmware-petalite/firmware.bin --sys-clk-freq=1e6 --load --debug-bridge
+litex_server --udp --udp-ip=192.168.1.50
+gtkwave build-soc/host/gateware/sim.fst
+litex_cli --csr-csv="./build-soc/host/csr.csv" --read petalite_rsp_value
+
+
+
+export PATH="/tools/verilator/v5.036-48-g0dc93c1d5/bin:$PATH"
+./soc/host_debug.py --sim --io-json=./soc/data/io_sim.json --debug-bridge
+./soc/firmware/main.py --src-dir=host_debug --build-path=./build-soc/host --output-dir=build-firmware-host --firmware-name=firmware --mem=rom
+./soc/host_debug.py --sim --compile-gateware --io-json=./soc/data/io_sim.json --host-firmware=build-firmware-host/firmware.bin --sys-clk-freq=1e6 --load --debug-bridge
+
+
+
+
+
+
+
+
+
+./soc/firmware/main.py --src-dir=host --build-path=./build-soc/host --output-dir=build-firmware-host --firmware-name=firmware --mem=rom
+gtkwave build-soc/host/gateware/sim.fst
+./soc/host.py --sim --io-json=./soc/data/io_sim.json --debug
+
+
 
 
 ./soc/soc.py --sim --compile-gateware --io-json=./soc/data/io_sim.json --firmware=firmware/firmware.bin --sys-clk-freq=1e6

@@ -27,6 +27,84 @@ def str_to_int(s):
     return int(f)
 
 
+def host_arg_parser_debug():
+    parser = argparse.ArgumentParser(description="Project Petalite SoC")
+
+    parser.add_argument(
+        "--sys-clk-freq",
+        type=str_to_int,
+        default=1e8,
+        help="System clock frequency",
+    )
+
+    parser.add_argument(
+        "--load",
+        action="store_true",
+        default=False,
+        help="Either load the bitstream or run the simulation.",
+    )
+
+    parser.add_argument(
+        "--compile-gateware",
+        action="store_true",
+        default=False,
+        help="Only build the gateware.",
+    )
+
+    parser.add_argument(
+        "--sim",
+        action="store_true",
+        default=False,
+        help="Build for simulation or real board",
+    )
+
+    parser.add_argument(
+        "--io-json",
+        type=str,
+        help="Path to the io json config. Required for a simulated platform.",
+    )
+
+    parser.add_argument(
+        "--host-firmware",
+        type=str,
+        help="Path to the firmware binary file. Required if --load is set.",
+    )
+
+    parser.add_argument(
+        "--rtl-dir-path",
+        type=str,
+        default="./dilithium-hw",
+        help="Directory path for custom cores",
+    )
+    parser.add_argument(
+        "--build-dir",
+        type=str,
+        default="./build-soc",
+        help="Path to the build dir.",
+    )
+    parser.add_argument(
+        "--debug-bridge",
+        action="store_true",
+        default=False,
+        help="Debug bridge.",
+    )
+
+    parser.add_argument(
+        "--trace",
+        action="store_true",
+        default=False,
+        help="Generate waveforms or not.",
+    )
+
+    args = parser.parse_args()
+    if args.sim and not args.io_json:
+        parser.error("Simulated platform requires a pin map json.")
+    if args.load and (not (args.host_firmware)):
+        parser.error("Loading requires firmware binary")
+
+    return args
+
+
 def host_arg_parser():
     parser = argparse.ArgumentParser(description="Project Petalite SoC")
 
@@ -96,10 +174,16 @@ def host_arg_parser():
         help="Path to the build dir.",
     )
     parser.add_argument(
-        "--debug",
+        "--trace",
         action="store_true",
         default=False,
         help="Generate waveforms or not.",
+    )
+    parser.add_argument(
+        "--debug-bridge",
+        action="store_true",
+        default=False,
+        help="Debug bridge.",
     )
 
     args = parser.parse_args()

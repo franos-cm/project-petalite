@@ -3,10 +3,7 @@ import os
 from functools import partial
 from typing import Callable
 
-from migen import *
 from migen.genlib.io import CRG
-from litex.soc.integration.soc import SoCRegion
-from litex.soc.integration.export import get_csr_csv
 
 from litex.soc.cores.dna import DNA
 from litex.soc.integration.builder import Builder
@@ -18,8 +15,7 @@ from litex.build.sim.config import SimConfig
 from litex.build.generic_platform import GenericPlatform
 
 from platforms import PetaliteSimPlatform
-from helpers import CoreType, host_arg_parser, generate_gtkw_savefile
-from csr_mailbox import HostMailbox
+from helpers import CoreType, host_arg_parser_debug, generate_gtkw_savefile
 from petalite import PetaliteCore
 
 
@@ -31,7 +27,6 @@ class EmbeddedHost(SoCCore):
         debug_bridge: bool = False,
         trace: bool = False,
         host_rom_init: str | list = [],
-        core_rom_init: str | list = [],
         platform_passthrough: bool = True,
     ):
 
@@ -65,12 +60,9 @@ class EmbeddedHost(SoCCore):
         # self.add_id()
         self.setup_clk()
         self.add_io()
-        self.add_petalite_core(
-            platform_factory=platform_factory,
-            core_rom_init=core_rom_init,
-        )
 
         if debug_bridge:
+            print("99999999999")
             self.add_etherbone_bridge()
 
         if trace:
@@ -109,58 +101,9 @@ class EmbeddedHost(SoCCore):
 
     def add_io(self: SoCCore):
         if self.is_simulated:
-            pass
-            # uart_pads = self.platform_instance.request("serial", 0)
             self.add_uart(uart_name="sim")
         else:
             self.add_uart(uart_name="serial")
-
-    def add_petalite_core(
-        self: SoCCore,
-        platform_factory: Callable[[], GenericPlatform],
-        core_rom_init: str | list = [],
-    ):
-        # Add bus master interfaces
-        petalite_reader = wishbone.Interface(data_width=64)
-        petalite_writer = wishbone.Interface(data_width=64)
-        self.bus.add_master(name="petalite_reader", master=petalite_reader)
-        self.bus.add_master(name="petalite_writer", master=petalite_writer)
-
-        platform = (
-            self.platform_instance if self.platform_passthrough else platform_factory()
-        )
-
-        petalite = PetaliteCore(
-            core_type=CoreType.EMBEDDED,
-            platform=platform,
-            sys_clk_freq=self.clk_freq,
-            clk_domain_name="petalite_sys" if self.platform_passthrough else "sys",
-            host_bus_interfaces=(petalite_reader, petalite_writer),
-            integrated_rom_init=core_rom_init,
-        )
-        self.comb += [
-            petalite.cd_sys.clk.eq(self.crg.cd_sys.clk),
-            petalite.cd_sys.rst.eq(self.crg.cd_sys.rst),
-        ]
-
-        self.submodules.petalite = petalite
-        # self.add_csr("petalite")
-
-        # Create host's mailbox
-        self.submodules.host_mailbox = HostMailbox()
-
-        # ONLY add host's CSRs to host
-        self.add_csr("host_mailbox")
-
-        # Connect the mailboxes
-        self.comb += [
-            # Host → Petalite
-            self.petalite.mailbox.rx_data.eq(self.host_mailbox.tx_data),
-            self.petalite.mailbox.rx_valid.eq(self.host_mailbox.tx_valid),
-            # Petalite → Host
-            self.host_mailbox.rx_data.eq(self.petalite.mailbox.tx_data),
-            self.host_mailbox.rx_valid.eq(self.petalite.mailbox.tx_valid),
-        ]
 
 
 def get_platform(io_json, rtl_dir_path, is_simulated):
@@ -171,7 +114,7 @@ def get_platform(io_json, rtl_dir_path, is_simulated):
 
 def main():
     # TODO: check LitePCIeSoC
-    args = host_arg_parser()
+    args = host_arg_parser_debug()
 
     # Platform definition. NOTE: hacky way to be able to compile both accelerator and host using the same platform (copied twice)
     platform_factory = partial(
@@ -186,10 +129,7 @@ def main():
         platform_factory=platform_factory,
         sys_clk_freq=args.sys_clk_freq,
         host_rom_init=args.host_firmware,
-        core_rom_init=args.petalite_firmware,
-        platform_passthrough=not args.compile_petalite_software,
         debug_bridge=args.debug_bridge,
-        trace=args.trace,
     )
 
     host_builder = Builder(
@@ -203,24 +143,10 @@ def main():
         sim_config.add_clocker("sys_clk", freq_hz=args.sys_clk_freq)
         sim_config.add_module("serial2console", "serial")
 
-        # sim_config.add_module("serial2tcp", ("serial", 0), args={"port": 4321})
-        # sim_config.add_module("serial2tcp", ("serial", 1), args={"port": 4322})
-
         if args.debug_bridge:
             sim_config.add_module(
                 "ethernet", "eth", args={"interface": "tap0", "ip": "192.168.1.100"}
             )
-
-        # Host Building stage
-        if args.compile_petalite_software:
-            petalite_soc = soc.petalite
-            petalite_builder = Builder(
-                soc=petalite_soc,
-                output_dir=os.path.join(args.build_dir, "petalite"),
-                compile_gateware=False,
-            )
-            print("\nBuilding Petalite Core...\n")
-            petalite_builder.build()
 
         print("\nBuilding Host...\n")
         host_builder.build(
@@ -235,34 +161,6 @@ def main():
             trace=args.trace,
             trace_fst=args.trace,
         )
-
-        # Dump only the Petalite banks – these are the addresses Petalite’s CPU sees.
-        with open(os.path.join(args.build_dir, "csr_host.csv"), "w") as f:
-            for name, reg in sorted(
-                soc.csr_regions.items(), key=lambda kv: kv[1].origin
-            ):
-                f.write(f"{name},0x{reg.origin:08x},{reg.busword*8},rw\n")
-
-        # Dump only the Petalite banks – these are the addresses Petalite’s CPU sees.
-        with open(os.path.join(args.build_dir, "csr_petalite.csv"), "w") as f:
-            for name, reg in sorted(
-                soc.petalite.csr_regions.items(), key=lambda kv: kv[1].origin
-            ):
-                f.write(f"{name},0x{reg.origin:08x},{reg.busword*8},rw\n")
-
-        csv_text = get_csr_csv(
-            soc.petalite.csr_regions, soc.petalite.constants, soc.petalite.mem_regions
-        )  # full register‑level table
-        csv_path = os.path.join(args.build_dir, "csr_petalite_full.csv")
-        with open(csv_path, "w") as f:
-            f.write(csv_text)
-
-        csv_text = get_csr_csv(
-            soc.csr_regions, soc.constants, soc.mem_regions
-        )  # full register‑level table
-        csv_path = os.path.join(args.build_dir, "csr_host_full.csv")
-        with open(csv_path, "w") as f:
-            f.write(csv_text)
 
     else:
         platform = soc.platform_instance

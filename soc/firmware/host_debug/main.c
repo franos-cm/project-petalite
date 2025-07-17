@@ -87,79 +87,6 @@ static void reboot_cmd(void)
 	ctrl_reset_write(1);
 }
 
-// static void send_command(uint32_t value)
-// {
-// 	printf("Writing value...\n");
-// 	petalite_cmd_value_write(value);
-// 	petalite_cmd_valid_write(1);
-// 	printf("Wrote: %u\n", value);
-// 	printf("Awaiting petalite acknowledge...\n");
-
-// 	// Wait for petalite to acknowledge
-// 	while (!petalite_cmd_ack_read())
-// 		;
-
-// 	printf("Petalite acknowledged!\n");
-
-// 	// Clear valid
-// 	petalite_cmd_valid_write(0);
-
-// 	printf("Host cleared valid...\n");
-
-// 	// Wait for petalite to clear ack
-// 	while (petalite_cmd_ack_read())
-// 		;
-
-// 	printf("Petalite cleared ack...\n");
-// }
-
-// static uint32_t receive_response(void)
-// {
-// 	// Wait for valid response
-// 	printf("Host waiting for valid rsp...\n");
-// 	while (!petalite_rsp_valid_read())
-// 		;
-
-// 	uint32_t response = petalite_rsp_value_read();
-// 	printf("Host received response: %u\n", response);
-
-// 	// Acknowledge and wait for petalite to clear
-// 	petalite_rsp_ack_write(1);
-
-// 	printf("AAAAAAAAAA");
-// 	while (petalite_rsp_valid_read())
-// 		;
-// 	petalite_rsp_ack_write(0);
-
-// 	return response;
-// }
-
-// static void test_cmd(void)
-// {
-// 	send_command(42);
-// 	uint32_t res = receive_response(); // should be 84
-
-// 	send_command(7);
-// 	res = receive_response(); // should be 14
-// }
-
-// static void test_cmd(void)
-// {
-// 	uint32_t input_host = host_mailbox_to_petalite_read();
-// 	host_mailbox_to_petalite_write(input_host + 2);
-// }
-
-// static void test_cmd2(void)
-// {
-// 	uint32_t output_device = host_mailbox_from_petalite_read();
-// 	printf("Host received response: %u\n", output_device);
-// }
-
-static void test_cmd3(void)
-{
-	printf("AA\n");
-}
-
 static void console_service(void)
 {
 	char *str;
@@ -173,12 +100,6 @@ static void console_service(void)
 		help();
 	else if (strcmp(token, "reboot") == 0)
 		reboot_cmd();
-	// else if (strcmp(token, "test") == 0)
-	// 	test_cmd();
-	// else if (strcmp(token, "test2") == 0)
-	// test_cmd2();
-	else if (strcmp(token, "test") == 0)
-		test_cmd3();
 	prompt();
 }
 
