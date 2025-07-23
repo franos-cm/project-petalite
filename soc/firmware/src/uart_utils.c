@@ -1,24 +1,34 @@
+#include <stdio.h>
+#include <libbase/uart.h>
+#include <libbase/console.h>
 #include "uart_utils.h"
 #include "dilithium_utils.h"
 
-static void uart_send_ack(void)
+void uart_send_ack(void)
 {
     putchar(DILITHIUM_ACK_BYTE);
 }
 
-static void uart_read(volatile uint8_t *dst, uint32_t len)
+void uart_readn(volatile uint8_t *dst, uint32_t total_len, uint32_t ack_group_length)
 {
-    for (uint32_t i = 0; i < len; ++i)
+    if (ack_group_length > total_len)
     {
-        while (!readchar_nonblock())
-        {
-            // wait for input byte
-        }
+        ack_group_length = total_len;
+    }
+
+    for (uint32_t i = 0; i < total_len; i++)
+    {
         dst[i] = getchar();
+
+        // Send an ACK every ack_group_length bytes
+        if (ack_group_length && ((i + 1) % ack_group_length == 0 || i == total_len - 1))
+        {
+            uart_send_ack();
+        }
     }
 }
 
-static void uart_read_chunks(uint8_t *dest, uint16_t total_len)
+void uart_read_chunks(uint8_t *dest, uint16_t total_len)
 {
     uint16_t received = 0;
 
@@ -31,10 +41,10 @@ static void uart_read_chunks(uint8_t *dest, uint16_t total_len)
         // Wait for full chunk
         for (int i = 0; i < chunk_len; ++i)
         {
-            while (!readchar_nonblock())
-            {
-                // wait
-            }
+            // while (!readchar_nonblock())
+            // {
+            //     // wait
+            // }
             dest[received + i] = getchar();
         }
 

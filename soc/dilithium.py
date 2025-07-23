@@ -1,8 +1,9 @@
-from migen import Module, Signal, Instance, ClockSignal, ResetSignal
+from migen import Module, Instance, ClockSignal, ResetSignal
 from litex.soc.interconnect import stream
+from litex.soc.interconnect.csr import CSRStorage, AutoCSR
 
 
-class Dilithium(Module):
+class Dilithium(Module, AutoCSR):
     def __init__(self):
         # AXI-Stream endpoints -------------------------------------------------
         layout = [("data", 64)]
@@ -10,19 +11,20 @@ class Dilithium(Module):
         self.source = stream.Endpoint(layout)  # output from RTL
 
         # Control/CSR wires ----------------------------------------------------
-        self.start = Signal()
-        self.mode = Signal(2)
-        self.sec_lvl = Signal(3)
+        self.start = CSRStorage(1)
+        self.mode = CSRStorage(2)
+        self.security_level = CSRStorage(3)
+        self.reset = CSRStorage(1)
 
         # RTL instance ---------------------------------------------------------
         self.specials += Instance(
             "dilithium",
             # Control
             i_clk=ClockSignal(),
-            i_rst=ResetSignal(),
-            i_start=self.start,
-            i_mode=self.mode,
-            i_sec_lvl=self.sec_lvl,
+            i_rst=(ResetSignal() | self.reset.storage),
+            i_start=self.start.storage,
+            i_mode=self.mode.storage,
+            i_sec_lvl=self.security_level.storage,
             # Stream input
             i_valid_i=self.sink.valid,
             o_ready_i=self.sink.ready,

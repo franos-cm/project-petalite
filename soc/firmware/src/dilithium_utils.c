@@ -1,6 +1,7 @@
 #include "dilithium_utils.h"
+#include <generated/csr.h>
 
-static int invalid_header(dilithium_header_t *dh)
+int invalid_header(dilithium_header_t *dh)
 {
     // Validate security level
     if (dh->sec_lvl != 2 && dh->sec_lvl != 3 && dh->sec_lvl != 5)
@@ -14,26 +15,38 @@ static int invalid_header(dilithium_header_t *dh)
     return 0;
 }
 
-static void dilithium_setup(uint8_t op, uint16_t sec_level)
+void dilithium_setup(uint8_t op, uint16_t sec_level)
 {
-    main_mode_write(op);
-    main_sec_lvl_write(sec_level);
+    dilithium_mode_write(op);
+    dilithium_security_level_write(sec_level);
 }
 
-static void dilithium_start()
+void dilithium_start(void)
 {
-    main_start_write(1);
-    main_start_write(0);
+    dilithium_start_write(1);
+    dilithium_start_write(0);
 }
 
-static void dilithium_reset()
+void dilithium_reset(void)
 {
-    main_start_write(1);
-    main_start_write(0);
+    dilithium_reset_write(1);
+    dilithium_reset_write(0);
 }
 
-static void dilithium_init()
+void dilithium_dma_read_setup(uint64_t base_addr, uint32_t length)
 {
-    main_reset_write(1);
-    main_reset_write(0);
+    dilithium_reader_base_write(base_addr);
+    dilithium_reader_length_write(length);
+}
+
+void dilithium_dma_read_start(void)
+{
+    dilithium_reader_enable_write(1);
+}
+
+void dilithium_dma_read_wait(void)
+{
+    while (!dilithium_reader_done_read())
+        ;
+    dilithium_reader_enable_write(0);
 }

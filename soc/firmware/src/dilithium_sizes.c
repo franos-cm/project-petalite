@@ -1,6 +1,6 @@
 #include "dilithium_sizes.h"
 
-static int get_sig_len(uint8_t lvl)
+int get_sig_len(uint8_t lvl)
 {
     switch (lvl)
     {
@@ -15,7 +15,7 @@ static int get_sig_len(uint8_t lvl)
     }
 }
 
-static int get_pk_len(uint8_t lvl)
+int get_pk_len(uint8_t lvl)
 {
     switch (lvl)
     {
@@ -30,7 +30,7 @@ static int get_pk_len(uint8_t lvl)
     }
 }
 
-static int get_sk_len(uint8_t lvl)
+int get_sk_len(uint8_t lvl)
 {
     switch (lvl)
     {
@@ -45,22 +45,7 @@ static int get_sk_len(uint8_t lvl)
     }
 }
 
-static int get_c_len(uint8_t lvl)
-{
-    switch (lvl)
-    {
-    case 2:
-        return DILITHIUM_C_LVL2_SIZE;
-    case 3:
-        return DILITHIUM_C_LVL3_SIZE;
-    case 5:
-        return DILITHIUM_C_LVL5_SIZE;
-    default:
-        return -1;
-    }
-}
-
-static int get_h_len(uint8_t lvl)
+int get_h_len(uint8_t lvl)
 {
     switch (lvl)
     {
@@ -75,7 +60,7 @@ static int get_h_len(uint8_t lvl)
     }
 }
 
-static int get_s1_len(uint8_t lvl)
+int get_s1_len(uint8_t lvl)
 {
     switch (lvl)
     {
@@ -90,7 +75,7 @@ static int get_s1_len(uint8_t lvl)
     }
 }
 
-static int get_s2_len(uint8_t lvl)
+int get_s2_len(uint8_t lvl)
 {
     switch (lvl)
     {
@@ -105,7 +90,7 @@ static int get_s2_len(uint8_t lvl)
     }
 }
 
-static int get_t0_len(uint8_t lvl)
+int get_t0_len(uint8_t lvl)
 {
     switch (lvl)
     {
@@ -120,7 +105,7 @@ static int get_t0_len(uint8_t lvl)
     }
 }
 
-static int get_t1_len(uint8_t lvl)
+int get_t1_len(uint8_t lvl)
 {
     switch (lvl)
     {
@@ -135,22 +120,7 @@ static int get_t1_len(uint8_t lvl)
     }
 }
 
-static int get_tr_len(uint8_t lvl)
-{
-    switch (lvl)
-    {
-    case 2:
-        return DILITHIUM_TR_LVL2_SIZE;
-    case 3:
-        return DILITHIUM_TR_LVL3_SIZE;
-    case 5:
-        return DILITHIUM_TR_LVL5_SIZE;
-    default:
-        return -1;
-    }
-}
-
-static int get_z_len(uint8_t lvl)
+int get_z_len(uint8_t lvl)
 {
     switch (lvl)
     {

@@ -5,7 +5,6 @@ from litex.soc.cores.dna import DNA
 from litex.soc.cores.dma import WishboneDMAReader, WishboneDMAWriter
 from litex.soc.integration.builder import Builder
 from litex.soc.integration.soc_core import SoCCore
-from litex.soc.interconnect.csr import CSRStorage
 from litex.soc.interconnect import wishbone
 
 from litex.build.sim import SimPlatform
@@ -30,6 +29,7 @@ class PetaliteCore(SoCCore):
         sys_clk_freq: int,
         integrated_rom_init: str | list = [],
         clk_domain_name: str = None,
+        debug_bridge: bool = False,
         trace: bool = False,
     ):
         self.platform_instance = platform
@@ -62,6 +62,8 @@ class PetaliteCore(SoCCore):
         self.add_id()
         self.add_io()
         self.add_dilithium()
+        if debug_bridge:
+            self.add_etherbone_bridge()
 
         if trace:
             self.comb += self.platform_instance.trace.eq(1)
@@ -106,22 +108,25 @@ class PetaliteCore(SoCCore):
         self.add_csr("dilithium_reader")
         self.add_csr("dilithium_writer")
 
-        self.start = CSRStorage(1)
-        self.mode = CSRStorage(2)
-        self.sec_lvl = CSRStorage(3)
-        self.add_csr("start")
-        self.add_csr("mode")
-        self.add_csr("sec_lvl")
-
         self.submodules.dilithium = Dilithium()
-
+        self.add_csr("dilithium")
         self.comb += [
             self.dilithium_reader.source.connect(self.dilithium.sink),
             self.dilithium.source.connect(self.dilithium_writer.sink),
-            self.dilithium.start.eq(self.start.storage),
-            self.dilithium.mode.eq(self.mode.storage),
-            self.dilithium.sec_lvl.eq(self.sec_lvl.storage),
         ]
+
+        # Add memory region for sig and pk
+        # NOTE: this puts the buffer inside of IO region
+        # I guess thats not ideal... but otherwise, the CPU was unable
+        # to access the given mem position, like 0x83000000.
+        # We also had to add an extra param to the add_ram method to account for that.
+        self.add_ram(
+            "dilithium_buffer",
+            origin=0x30000000,
+            size=0x2000,
+            mode="rw",
+            custom=True,
+        )
 
     def add_etherbone_bridge(self: SoCCore):
         self.ethphy = LiteEthPHYModel(self.platform.request("eth", 0))
@@ -159,6 +164,7 @@ def main():
         comm_protocol=args.comm,
         integrated_rom_init=args.firmware,
         trace=args.trace,
+        debug_bridge=args.debug_bridge,
     )
 
     # Building stage
@@ -170,7 +176,12 @@ def main():
         sim_config = SimConfig()
         sim_config.add_clocker("sys_clk", freq_hz=args.sys_clk_freq)
         if args.comm == CommProtocol.UART:
-            sim_config.add_module("serial2console", "serial")
+            sim_config.add_module("serial2tcp", ("serial", 0), args={"port": 4327})
+
+        if args.debug_bridge:
+            sim_config.add_module(
+                "ethernet", "eth", args={"interface": "tap0", "ip": "192.168.1.100"}
+            )
 
         builder.build(
             run=args.load,

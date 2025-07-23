@@ -85,6 +85,13 @@ def arg_parser():
         help="Generate waveforms or not.",
     )
 
+    parser.add_argument(
+        "--debug-bridge",
+        action="store_true",
+        default=False,
+        help="Add etherbone bridge.",
+    )
+
     args = parser.parse_args()
     print(args.sim)
     if args.sim and not args.io_json:
