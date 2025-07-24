@@ -38,9 +38,13 @@ module combined_top #(
     input [W-1:0]      data_i,
     output reg         valid_o = 0,
     input              ready_o,
-    output reg [W-1:0] data_o = 0
+    output reg [W-1:0] data_o = 0,
+    output reg [4:0] cstate0_out = 0,
+    output reg [4:0] cstate1_out = 0,
+    output reg [4:0] cstate2_out = 0,
+    output reg [9:0] ctr_out = 0
     );
-    
+
     localparam
         KG_INIT        = 4'd0,
         KG_HASH_Z      = 4'd1,     
@@ -112,6 +116,11 @@ module combined_top #(
     reg [9:0] ctr, ctr_next;
     reg [9:0] ctrfsm2, ctrfsm2_next;
     reg [9:0] ctrfsm1, ctrfsm1_next;
+
+    assign cstate0_out = cstate0;
+    assign cstate1_out = cstate1;
+    assign cstate2_out = cstate2;
+    assign ctr_out = ctr;
     
     reg [9:0] ctr0fsm2, ctr0fsm2_next;
     

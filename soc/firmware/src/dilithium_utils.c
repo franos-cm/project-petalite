@@ -15,6 +15,13 @@ int invalid_header(dilithium_header_t *dh)
     return 0;
 }
 
+void dilithium_init(void)
+{
+    dilithium_reset_write(1);
+    dilithium_start_write(0);
+    dilithium_reset_write(0);
+}
+
 void dilithium_setup(uint8_t op, uint16_t sec_level)
 {
     dilithium_mode_write(op);

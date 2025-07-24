@@ -15,9 +15,45 @@
 // NOTE: this should be 64 bit aligned
 extern uint8_t _dilithium_buffer_start[];
 
+int cstate0 = 0;
+int cstate1 = 0;
+int cstate2 = 0;
+int ctr = 0;
+
 static inline uint32_t align8(uint32_t x)
 {
 	return (x + 7) & ~7;
+}
+
+// static inline uint32_t dilithium_cstate0_read(void) {
+// 	return csr_read_simple((CSR_BASE + 0x1010L));
+// }
+// static inline uint32_t dilithium_cstate1_read(void) {
+// 	return csr_read_simple((CSR_BASE + 0x1014L));
+// }
+// static inline uint32_t dilithium_cstate2_read(void) {
+// 	return csr_read_simple((CSR_BASE + 0x1018L));
+// }
+
+static inline void print_debug_state_change(void)
+{
+	int new_cstate0 = dilithium_cstate0_read();
+	int new_cstate1 = dilithium_cstate1_read();
+	int new_cstate2 = dilithium_cstate2_read();
+	int new_ctr = dilithium_ctr_read();
+
+	if ((new_cstate0 != cstate0) || (new_cstate1 != cstate1) || (new_cstate2 != cstate2) || ((new_ctr != ctr)))
+	{
+		cstate0 = new_cstate0;
+		cstate1 = new_cstate1;
+		cstate2 = new_cstate2;
+		ctr = new_ctr;
+		putchar(0xFF);
+		putchar(ctr & 0xFF);
+		putchar(cstate0 & 0xFF);
+		putchar(cstate1 & 0xFF);
+		putchar(cstate2 & 0xFF);
+	}
 }
 
 // Buffers
@@ -57,7 +93,17 @@ static int handle_verify(uint8_t sec_level, uint16_t msg_len)
 	const uintptr_t mlen_addr = t1_addr + align8(t1_len);
 	const uintptr_t h_addr = mlen_addr + sizeof(uint64_t);
 	const uintptr_t msg_chunk_addr = h_addr + align8(h_len);
+	const uintptr_t result_addr = msg_chunk_addr + align8(DILITHIUM_CHUNK_SIZE);
 	const int first_payload_size = h_addr - base_buffer_addr;
+
+	// Debug
+	const size_t complete_payload_size = (size_t)(msg_chunk_addr - base_buffer_addr) + msg_len;
+	putchar(0x11);
+	putchar(0x11);
+	putchar((complete_payload_size >> 0) & 0xFF);
+	putchar((complete_payload_size >> 8) & 0xFF);
+	putchar((complete_payload_size >> 16) & 0xFF);
+	putchar((complete_payload_size >> 24) & 0xFF);
 
 	// Load happens in the specific order defined by the Dilthium core used
 	// TODO: maybe sending the non message ACKs is unnecessary
@@ -71,11 +117,21 @@ static int handle_verify(uint8_t sec_level, uint16_t msg_len)
 	// Read T1
 	uart_readn((volatile uint8_t *)t1_addr, t1_len, base_ack_group_length);
 	// Write mlen
-	*(uint64_t *)mlen_addr = msg_len;
+	((volatile uint8_t *)mlen_addr)[0] = (msg_len >> 8) & 0xFF; // high byte
+	((volatile uint8_t *)mlen_addr)[1] = msg_len & 0xFF;		// low byte
+	for (int i = 2; i < 8; ++i)
+	{
+		((volatile uint8_t *)mlen_addr)[i] = 0x00;
+	}
+	//*(uint64_t *)mlen_addr = msg_len;
 
 	// Start DMA
 	dilithium_dma_read_setup((uint64_t)base_buffer_addr, first_payload_size);
 	dilithium_dma_read_start();
+	// Writer too!
+	dilithium_writer_base_write((uint64_t)result_addr);
+	dilithium_writer_length_write(8); // TODO: check this
+	dilithium_writer_enable_write(1);
 	// And Dilithium!
 	dilithium_start();
 
@@ -159,8 +215,6 @@ static int handle_verify(uint8_t sec_level, uint16_t msg_len)
 	putchar(0xEE);
 
 	// NOTE: we can reuse the base_addr since it has already been ingested
-	dilithium_writer_base_write((uint64_t)base_buffer_addr);
-	dilithium_writer_length_write(8); // TODO: check this
 
 	putchar(0x99);
 	putchar(0x99);
@@ -173,9 +227,10 @@ static int handle_verify(uint8_t sec_level, uint16_t msg_len)
 	putchar(0x88);
 	putchar(0x88);
 
-	dilithium_writer_enable_write(1);
 	while (!dilithium_writer_done_read())
-		;
+	{
+		print_debug_state_change();
+	}
 
 	putchar(0xFF);
 	putchar(0xFF);
@@ -196,7 +251,6 @@ static void process_uart_command(void)
 	dilithium_header_t header;
 
 	// Ingest header
-	dilithium_debug_state_write(3);
 	header.cmd = getchar();
 	header.sec_lvl = getchar();
 	header.msg_len = getchar();
@@ -240,8 +294,8 @@ int main(void)
 	irq_setmask(0);
 	irq_setie(1);
 #endif
-	dilithium_reset();
 	uart_init();
+	dilithium_init();
 
 	// Wait for START
 	while (getchar() != DILITHIUM_START_BYTE)

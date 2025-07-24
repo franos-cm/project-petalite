@@ -27,6 +27,7 @@ typedef struct
 } __attribute__((packed)) dilithium_response_t;
 
 int invalid_header(dilithium_header_t *dh);
+void dilithium_init(void);
 void dilithium_setup(uint8_t op, uint16_t sec_level);
 void dilithium_start(void);
 void dilithium_reset(void);

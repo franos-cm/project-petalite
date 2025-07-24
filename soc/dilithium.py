@@ -1,6 +1,6 @@
 from migen import Module, Instance, ClockSignal, ResetSignal
 from litex.soc.interconnect import stream
-from litex.soc.interconnect.csr import CSRStorage, AutoCSR
+from litex.soc.interconnect.csr import CSRStorage, CSRStatus, AutoCSR
 
 
 class Dilithium(Module, AutoCSR):
@@ -15,6 +15,12 @@ class Dilithium(Module, AutoCSR):
         self.mode = CSRStorage(2)
         self.security_level = CSRStorage(3)
         self.reset = CSRStorage(1)
+
+        # Debug/status outputs -------------------------------------------------
+        self.cstate0 = CSRStatus(5)
+        self.cstate1 = CSRStatus(5)
+        self.cstate2 = CSRStatus(5)
+        self.ctr = CSRStatus(10)
 
         # RTL instance ---------------------------------------------------------
         self.specials += Instance(
@@ -33,4 +39,9 @@ class Dilithium(Module, AutoCSR):
             o_valid_o=self.source.valid,
             i_ready_o=self.source.ready,
             o_data_o=self.source.data,
+            # Debug
+            o_cstate0_out=self.cstate0.status,
+            o_cstate1_out=self.cstate1.status,
+            o_cstate2_out=self.cstate2.status,
+            o_ctr_out=self.ctr.status,
         )
