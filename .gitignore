@@ -14,3 +14,4 @@ keccak/*
 dilithium-vivado/*
 sim
 *xpr
+soc/firmware/src_*
