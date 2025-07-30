@@ -12,11 +12,7 @@ module dilithium (
     output logic           valid_o,
     input  logic           ready_o,
     output logic[63:0]     data_o,
-    output logic           last,
-    output logic [4:0] cstate0_out,
-    output logic [4:0] cstate1_out,
-    output logic [4:0] cstate2_out,
-    output logic [9:0] ctr_out
+    output logic           last
 );
     logic start_strobe;
     logic dilithium_valid_o, dilithium_ready_o;
@@ -54,11 +50,7 @@ module dilithium (
         .data_i (data_i),
         .valid_o (dilithium_valid_o),
         .ready_o (dilithium_ready_o),
-        .data_o (dilithium_data_o),
-        .cstate0_out (cstate0_out),
-        .cstate1_out (cstate1_out),
-        .cstate2_out (cstate2_out),
-        .ctr_out (ctr_out)
+        .data_o (dilithium_data_o)
     );
 
 endmodule
