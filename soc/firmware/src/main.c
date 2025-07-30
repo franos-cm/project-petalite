@@ -1,6 +1,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <stdint.h>
 
 #include <irq.h>
 #include <libbase/uart.h>
@@ -15,74 +16,18 @@
 // NOTE: this should be 64 bit aligned
 extern uint8_t _dilithium_buffer_start[];
 
-int cstate0 = 0;
-int cstate1 = 0;
-int cstate2 = 0;
-int ctr = 0;
-
 static inline uint32_t align8(uint32_t x)
 {
 	return (x + 7) & ~7;
 }
 
-// static inline uint32_t dilithium_cstate0_read(void) {
-// 	return csr_read_simple((CSR_BASE + 0x1010L));
-// }
-// static inline uint32_t dilithium_cstate1_read(void) {
-// 	return csr_read_simple((CSR_BASE + 0x1014L));
-// }
-// static inline uint32_t dilithium_cstate2_read(void) {
-// 	return csr_read_simple((CSR_BASE + 0x1018L));
-// }
-
-static inline void print_debug_state_change(void)
-{
-	int new_cstate0 = dilithium_cstate0_read();
-	int new_cstate1 = dilithium_cstate1_read();
-	int new_cstate2 = dilithium_cstate2_read();
-	int new_ctr = dilithium_ctr_read();
-
-	if ((new_cstate0 != cstate0) || (new_cstate1 != cstate1) || (new_cstate2 != cstate2) || ((new_ctr != ctr)))
-	{
-		cstate0 = new_cstate0;
-		cstate1 = new_cstate1;
-		cstate2 = new_cstate2;
-		ctr = new_ctr;
-		putchar(0xFF);
-		putchar(ctr & 0xFF);
-		putchar(cstate0 & 0xFF);
-		putchar(cstate1 & 0xFF);
-		putchar(cstate2 & 0xFF);
-	}
-}
-
-// Buffers
-// static uint8_t rx_buf[DILITHIUM_MAX_MSG_LEN];
-// static uint8_t tx_buf[4096];
-
-// static void send_response(const uint8_t *data, uint16_t len)
-// {
-// 	// Send length header
-// 	putchar(len & 0xFF);
-// 	putchar(len >> 8);
-
-// 	// Send data in chunks, with ACKs
-// 	for (int i = 0; i < len; i += DILITHIUM_CHUNK_SIZE)
-// 	{
-// 		uint16_t chunk_len = (len - i > DILITHIUM_CHUNK_SIZE) ? DILITHIUM_CHUNK_SIZE : (len - i);
-// 		uart_send_chunk(&data[i], chunk_len);
-// 		while (!readchar_nonblock())
-// 			;
-// 		if (getchar() != DILITHIUM_ACK_BYTE)
-// 			break;
-// 	}
-// }
-
-static int handle_verify(uint8_t sec_level, uint16_t msg_len)
+// TODO: do I really need to align the read length for dma?
+static int handle_verify(uint8_t sec_level, uint32_t msg_len)
 {
 	int z_len = get_z_len(sec_level);
 	int t1_len = get_t1_len(sec_level);
 	int h_len = get_h_len(sec_level);
+
 	// This could in theory all be precomputed,
 	// but I guess it would make it more confusing
 	const uintptr_t base_buffer_addr = (uintptr_t)_dilithium_buffer_start;
@@ -91,186 +36,96 @@ static int handle_verify(uint8_t sec_level, uint16_t msg_len)
 	const uintptr_t z_addr = c_addr + align8(DILITHIUM_C_SIZE);
 	const uintptr_t t1_addr = z_addr + align8(z_len);
 	const uintptr_t mlen_addr = t1_addr + align8(t1_len);
-	const uintptr_t h_addr = mlen_addr + sizeof(uint64_t);
-	const uintptr_t msg_chunk_addr = h_addr + align8(h_len);
-	const uintptr_t result_addr = msg_chunk_addr + align8(DILITHIUM_CHUNK_SIZE);
-	const int first_payload_size = h_addr - base_buffer_addr;
+	const uintptr_t msg_chunk_addr = mlen_addr + sizeof(uint64_t);
+	const uintptr_t h_addr = msg_chunk_addr + align8(DILITHIUM_CHUNK_SIZE);
+	const int first_payload_size = msg_chunk_addr - base_buffer_addr;
+	const uintptr_t result_addr = base_buffer_addr;
 
-	// Debug
-	const size_t complete_payload_size = (size_t)(msg_chunk_addr - base_buffer_addr) + msg_len;
-	putchar(0x11);
-	putchar(0x11);
-	putchar((complete_payload_size >> 0) & 0xFF);
-	putchar((complete_payload_size >> 8) & 0xFF);
-	putchar((complete_payload_size >> 16) & 0xFF);
-	putchar((complete_payload_size >> 24) & 0xFF);
-
-	// Load happens in the specific order defined by the Dilthium core used
-	// TODO: maybe sending the non message ACKs is unnecessary
+	// NOTE: load happens in the specific order defined by the Dilthium core used
 	int base_ack_group_length = 64;
 	// Read Rho
 	uart_readn((volatile uint8_t *)rho_addr, DILITHIUM_RHO_SIZE, DILITHIUM_RHO_SIZE);
 	// Read C
+	uart_send_ack();
 	uart_readn((volatile uint8_t *)c_addr, DILITHIUM_C_SIZE, DILITHIUM_C_SIZE);
 	// Read Z
+	uart_send_ack();
 	uart_readn((volatile uint8_t *)z_addr, z_len, base_ack_group_length);
 	// Read T1
+	uart_send_ack();
 	uart_readn((volatile uint8_t *)t1_addr, t1_len, base_ack_group_length);
 	// Write mlen
-	((volatile uint8_t *)mlen_addr)[0] = (msg_len >> 8) & 0xFF; // high byte
-	((volatile uint8_t *)mlen_addr)[1] = msg_len & 0xFF;		// low byte
-	for (int i = 2; i < 8; ++i)
-	{
+	for (int i = 0; i < 4; i++)
 		((volatile uint8_t *)mlen_addr)[i] = 0x00;
-	}
-	//*(uint64_t *)mlen_addr = msg_len;
+	for (int i = 4; i < 8; i++)
+		((volatile uint8_t *)mlen_addr)[i] = (msg_len >> (8 * (7 - i))) & 0xFF;
 
-	// Start DMA
-	dilithium_dma_read_setup((uint64_t)base_buffer_addr, first_payload_size);
-	dilithium_dma_read_start();
-	// Writer too!
-	dilithium_writer_base_write((uint64_t)result_addr);
-	dilithium_writer_length_write(8); // TODO: check this
-	dilithium_writer_enable_write(1);
-	// And Dilithium!
+	// Get writer and reader ready, and start Dilithium core!
+	dilithium_write_setup((uint64_t)result_addr, sizeof(uint64_t));
+	dilithium_write_start();
+	dilithium_read_setup((uint64_t)rho_addr, align8(first_payload_size));
+	dilithium_read_start();
 	dilithium_start();
 
 	// Read H
+	uart_send_ack();
 	uart_readn((volatile uint8_t *)h_addr, h_len, base_ack_group_length);
-	// Receive first message chunk
-	int chunk_len = (msg_len > DILITHIUM_CHUNK_SIZE) ? DILITHIUM_CHUNK_SIZE : (msg_len);
-	uart_readn((volatile uint8_t *)msg_chunk_addr, chunk_len, 0); // Dont send ack yet!
-	int message_bytes_read = chunk_len;
 
-	putchar(0x22);
-	putchar(0x22);
-	putchar(0x22);
-
-	// Check if first payload has been accepted
-	dilithium_dma_read_wait();
-
-	putchar(0x11);
-	putchar(0x11);
-	putchar(0x11);
-
-	// Common base addr for chunks
-	dilithium_dma_read_setup((uint64_t)msg_chunk_addr, chunk_len);
-	dilithium_dma_read_start();
-
-	putchar(0x33);
-	putchar(0x33);
-	putchar(0x33);
-
-	// If so, we can start ingesting message in chunks
+	// Ingest the entire message in chunks.
+	int message_bytes_read = 0;
 	while (message_bytes_read < msg_len)
 	{
-		putchar(0x66);
-		putchar(0x66);
-		putchar(0x66);
+		// Calculate the size of the next chunk to read.
+		int remaining_msg_bytes = msg_len - message_bytes_read;
+		int current_chunk_size = (remaining_msg_bytes > DILITHIUM_CHUNK_SIZE) ? DILITHIUM_CHUNK_SIZE : remaining_msg_bytes;
 
-		chunk_len = (msg_len - message_bytes_read > DILITHIUM_CHUNK_SIZE)
-						? DILITHIUM_CHUNK_SIZE
-						: (msg_len - message_bytes_read);
+		// Before starting the next DMA, wait for the previous one to complete.
+		dilithium_read_wait();
 
-		// When DMA is done, signal to uart that we are ready
-		dilithium_dma_read_wait();
-
-		putchar(0x44);
-		putchar(0x44);
-		putchar(0x44);
-
-		// Ingest next chunk
+		// For chunks 2 and onwards, we must first ACK the previously received chunk.
 		uart_send_ack();
-		uart_readn((volatile uint8_t *)msg_chunk_addr, chunk_len, 0);
-		// Pass it over to DMA
-		putchar(0x22);
-		putchar(0x22);
-		putchar(0x22);
+		uart_readn((volatile uint8_t *)msg_chunk_addr, current_chunk_size, base_ack_group_length);
 
-		dilithium_dma_read_setup((uint64_t)msg_chunk_addr, chunk_len);
-		dilithium_dma_read_start();
+		// Pass the newly read chunk to the DMA.
+		dilithium_read_setup((uint64_t)msg_chunk_addr, align8(current_chunk_size));
+		dilithium_read_start();
 
-		message_bytes_read += chunk_len;
+		message_bytes_read += current_chunk_size;
 	}
-	// TODO: check if we need last ACK here
+	// Wait for the LAST message chunk's DMA to finish.
+	dilithium_read_wait();
+	// Send the final ACK for the LAST message chunk.
 	uart_send_ack();
 
-	putchar(0xBB);
-	putchar(0xBB);
-	putchar(0xBB);
+	dilithium_read_setup((uint64_t)h_addr, align8(h_len));
+	dilithium_read_start();
+	dilithium_read_wait();
 
-	// Finally, we just need to ingest h
-	// Wait for last message chunk to be done
-	dilithium_dma_read_wait();
+	// Wait for the final result from the core
+	dilithium_write_wait();
 
-	putchar(0xDD);
-	putchar(0xDD);
-	putchar(0xDD);
-
-	dilithium_dma_read_setup((uint64_t)h_addr, h_len);
-	dilithium_dma_read_start();
-
-	putchar(0xEE);
-	putchar(0xEE);
-	putchar(0xEE);
-
-	// NOTE: we can reuse the base_addr since it has already been ingested
-
-	putchar(0x99);
-	putchar(0x99);
-	putchar(0x99);
-
-	// After input has been ingested, wait for output
-	dilithium_dma_read_wait();
-
-	putchar(0x88);
-	putchar(0x88);
-	putchar(0x88);
-
-	while (!dilithium_writer_done_read())
-	{
-		print_debug_state_change();
-	}
-
-	putchar(0xFF);
-	putchar(0xFF);
-	putchar(0xFF);
+	// Final result
+	uint64_t result = *((volatile uint64_t *)result_addr);
 
 	// Construct and send response
 	dilithium_response_t rsp;
-	rsp.verify_res = *((uint64_t *)base_buffer_addr);
 	rsp.cmd = DILITHIUM_CMD_VERIFY;
 	rsp.sec_lvl = sec_level;
 	rsp.rsp_code = 0;
+	rsp.verify_res = (result == 0);
+	uart_send_response(&rsp);
 
-	return *((uint64_t *)base_buffer_addr);
+	return 0;
 }
 
-static void process_uart_command(void)
+static void process_command(void)
 {
-	dilithium_header_t header;
-
-	// Ingest header
-	header.cmd = getchar();
-	header.sec_lvl = getchar();
-	header.msg_len = getchar();
-	header.msg_len |= ((uint16_t)getchar()) << 8;
-	// Ack header
-	uart_send_ack();
-
-	// if (header.msg_len == 0x21)
-	// {
-	// 	putchar(0x11);
-	// 	putchar(0x11);
-	// 	putchar(0x11);
-	// 	putchar(0x11);
-	// }
-
-	// Check if header is valid
-	// TODO: Make it so it returns the error code in the uart
+	dilithium_header_t header = uart_parse_request_header();
 	int invalid_header_code = invalid_header(&header);
 	if (invalid_header_code)
+		// TODO: Make it so it returns the error code in the uart
 		return;
+	uart_send_ack();
 
 	dilithium_reset();
 	dilithium_setup(header.cmd, header.sec_lvl);
@@ -297,9 +152,14 @@ int main(void)
 	uart_init();
 	dilithium_init();
 
-	// Wait for START
-	while (getchar() != DILITHIUM_START_BYTE)
-		;
+	do
+	{
+		uart_send_ready();
+	} while (!readchar_nonblock());
 
-	process_uart_command();
+	if (getchar() == DILITHIUM_START_BYTE)
+	{
+		uart_send_ack();
+		process_command();
+	}
 }

@@ -7,14 +7,10 @@ import queue
 class UARTConnection:
     """Clean UART communication class - handles only communication"""
 
-    def __init__(self, host="localhost", port=4327, debug: bool = True):
-        print(f"Connecting to {host}:{port}...")
-        self.sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-        self.sock.connect((host, port))
-        print("Connected!")
-
-        # Flags
+    def __init__(self, host="localhost", port=4327, debug: bool = True, max_wait=600):
         self.debug = debug
+        self.running = False
+        self._wait_for_sim_connection(host=host, port=port, max_wait=max_wait)
 
         # Thread-safe queues
         self.received_data = queue.Queue()
@@ -29,6 +25,33 @@ class UARTConnection:
         self.write_thread.start()
 
         print("Read/Write threads started")
+
+    def _wait_for_sim_connection(self, host, port, max_wait):
+        """Retry TCP connection to simulation until timeout"""
+        print(f"Connecting to {host}:{port}... (will wait up to {max_wait}s)")
+        self.sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+
+        try_count = 0
+        start_time = time.time()
+
+        while time.time() - start_time < max_wait:
+            try:
+                self.sock.connect((host, port))
+                elapsed = time.time() - start_time
+                print(f"✅ Connected to simulation after {elapsed:.2f} seconds!")
+                return
+
+            except (ConnectionRefusedError, socket.timeout):
+                elapsed = time.time() - start_time
+                print(
+                    f"[{elapsed:.2f}s] Simulation not ready yet (attempt {try_count}). Retrying..."
+                )
+                try_count += 1
+                time.sleep(0.1)
+
+        raise TimeoutError(
+            f"❌ Could not connect to simulation at {host}:{port} after {max_wait} seconds"
+        )
 
     def _read_worker(self):
         """Background thread that continuously reads from socket"""

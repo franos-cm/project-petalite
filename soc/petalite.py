@@ -65,7 +65,11 @@ class PetaliteCore(SoCCore):
         if debug_bridge:
             self.add_etherbone_bridge()
 
+        # Simulation debugging ----------------------------------------------------------------------
         if trace:
+            trace_reset_on = True
+            self.platform_instance.add_debug(self, reset=1 if trace_reset_on else 0)
+        else:
             self.comb += self.platform_instance.trace.eq(1)
 
     def setup_clk(self: SoCCore):
@@ -194,6 +198,7 @@ def main():
             ),
             trace=args.trace,
             trace_fst=args.trace,
+            trace_start=18_850_000_000 if args.trace else None,  # (in ns)
         )
 
     else:

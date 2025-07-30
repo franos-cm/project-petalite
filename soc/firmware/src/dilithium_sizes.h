@@ -1,3 +1,6 @@
+#ifndef DILITHIUM_SIZES_H
+#define DILITHIUM_SIZES_H
+
 #include <stdint.h>
 
 // TODO: change these if used
@@ -53,3 +56,5 @@ int get_t0_len(uint8_t lvl);
 int get_h_len(uint8_t lvl);
 int get_s1_len(uint8_t lvl);
 int get_s2_len(uint8_t lvl);
+
+#endif // DILITHIUM_SIZES_H

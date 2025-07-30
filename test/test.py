@@ -1,4 +1,5 @@
 import os
+import sys
 import time
 import struct
 
@@ -10,40 +11,50 @@ from uart import UARTConnection
 class DilithiumTester:
     """Dilithium test suite - uses UART connection for testing"""
 
-    def __init__(self, uart_connection):
-        self.uart = uart_connection
+    def __init__(self):
+        pass
 
-    def wait_for_ack(self, timeout=1200):
-        """Wait for ACK byte from firmware"""
+    def wait_for_ack(self, timeout=1500):
+        """Wait for ACK byte from firmware and log time to receive"""
+        start_time = time.perf_counter()
         if self.uart.wait_for_byte(DILITHIUM_ACK_BYTE, timeout):
-            print(f"[ACK] Received ACK!")
+            elapsed = time.perf_counter() - start_time
+            print(f"[ACK] Received ACK in {elapsed:.3f} seconds")
             return True
         else:
-            print(f"[TIMEOUT] No ACK received within {timeout}s")
+            elapsed = time.perf_counter() - start_time
+            print(
+                f"[TIMEOUT] No ACK received in {elapsed:.3f} seconds (timeout={timeout}s)"
+            )
             return False
 
-    def test_verify_operation(self, base_kat_path: str, sec_level=2, vector_index=0):
+    def test_verify_operation(
+        self, sec_level: int, test_vectors: list, uart_conn: UARTConnection
+    ):
         """Test the complete Dilithium verify operation"""
-        print(
-            f"\n=== Testing Dilithium Verify (Security Level {sec_level}, Vector {vector_index}) ==="
-        )
 
-        print("Loading test vectors from files...")
-        test_vectors = TestVectorReader.load_dilithium_vectors(
-            base_path=base_kat_path, sec_level=sec_level, vector_index=vector_index
-        )
-
+        self.uart = uart_conn
         try:
+            print(f"\n=== Test start ===")
             base_ack_group_length = 64
+
+            # Step 0: wait for READY
+            print("0. Waiting for READY byte...")
+            if not self.uart.wait_for_byte(DILITHIUM_READY_BYTE, timeout=300):
+                print("Failed to get READY, aborting")
+                return
 
             # Step 1: Send START byte
             print("1. Sending START byte...")
             self.uart.send_byte(DILITHIUM_START_BYTE)
+            if not self.wait_for_ack():
+                print("Failed to get START ACK, aborting")
+                return False
 
             # Step 2: Send header (cmd + sec_lvl + msg_len)
             print("2. Sending header...")
             msg_len = int(test_vectors["msg_len"].hex(), 16)
-            header = struct.pack("<BBH", DILITHIUM_CMD_VERIFY, sec_level, msg_len)
+            header = struct.pack("<BBI", DILITHIUM_CMD_VERIFY, sec_level, msg_len)
             self.uart.send_bytes(header)
 
             # Step 3: Wait for header ACK
@@ -147,13 +158,13 @@ class DilithiumTester:
                 chunk_num += 1
 
             print("✓ All data sent successfully!")
-            print("Verify operation completed. Check firmware output for results.")
 
             # Give some time to see any firmware responses
             self.uart.wait_for_bytes(num_bytes=1000, timeout=1200)
             print("TIMEOUT")
-            self.uart.flush_received_data()
 
+            self.uart.flush_received_data()
+            print("Verify operation completed. Check firmware output for results.")
             return True
 
         except Exception as e:
@@ -180,126 +191,34 @@ class DilithiumTester:
         print(f"\n=== Results: {success_count}/{num_vectors} vectors passed ===")
         return success_count == num_vectors
 
-    def test_verify_operation2(self, base_kat_path: str, sec_level=2, vector_index=0):
-        """Test the complete Dilithium verify operation"""
-        print(
-            f"\n=== Testing Dilithium Verify (Security Level {sec_level}, Vector {vector_index}) ==="
-        )
-
-        print("Loading test vectors from files...")
-        test_vectors = TestVectorReader.load_dilithium_vectors(
-            base_path=base_kat_path, sec_level=sec_level, vector_index=vector_index
-        )
-
-        try:
-            # Step 1: Send START byte
-            print("1. Sending START byte...")
-            self.uart.send_byte(DILITHIUM_START_BYTE)
-            time.sleep(0.1)  # Brief pause
-
-            # Step 2: Send header (cmd + sec_lvl + msg_len)
-            print("2. Sending header...")
-            msg_len = int(test_vectors["msg_len"].hex(), 16)
-            header = struct.pack("<BBH", DILITHIUM_CMD_VERIFY, sec_level, msg_len)
-            self.uart.send_bytes(header)
-
-            # Step 3: Wait for header ACK
-            # print("3. Waiting for header ACK...")
-            # if not self.wait_for_ack():
-            #     print("Failed to get header ACK, aborting")
-            #     return False
-
-            # Step 4: Send signature components in order
-            print("4. Sending signature components...")
-
-            # Send Rho
-            rho_data = test_vectors["rho"]
-            print(f"   Sending Rho ({len(rho_data)} bytes): {rho_data[:8].hex()}...")
-            self.uart.send_bytes(rho_data)
-            # if not self.wait_for_ack():
-            #     print("Failed to get Rho ACK")
-            #     return False
-
-            while True:
-                pass
-
-            return
-
-            # Send C
-            c_data = test_vectors["c"]
-            print(f"   Sending C ({len(c_data)} bytes): {c_data[:8].hex()}...")
-            self.uart.send_bytes(c_data)
-            # if not self.wait_for_ack():
-            #     print("Failed to get C ACK")
-            #     return False
-
-            return
-
-            # Send Z
-            z_data = test_vectors["z"]
-            print(f"   Sending Z ({len(z_data)} bytes): {z_data[:8].hex()}...")
-            self.uart.send_bytes(z_data)
-            if not self.wait_for_ack():
-                print("Failed to get Z ACK")
-                return False
-
-            # Send T1
-            t1_data = test_vectors["t1"]
-            print(f"Sending T1 ({len(t1_data)} bytes): {t1_data[:8].hex()}...")
-            self.uart.send_bytes(t1_data)
-            if not self.wait_for_ack():
-                print("Failed to get T1 ACK")
-                return False
-
-            # Send H
-            h_data = test_vectors["h"]
-            print(f"Sending H ({len(h_data)} bytes): {h_data[:8].hex()}...")
-            self.uart.send_bytes(h_data)
-            if not self.wait_for_ack():
-                print("Failed to get H ACK")
-                return False
-
-            # Step 5: Send message in chunks
-            message_data = test_vectors["msg"]
-            print(f"5. Sending message data ({msg_len} bytes) in chunks...")
-            print(f"Message preview: {message_data[:20]}...")
-            bytes_sent = 0
-            chunk_num = 1
-
-            while bytes_sent < msg_len:
-                chunk_size = min(DILITHIUM_CHUNK_SIZE, msg_len - bytes_sent)
-                chunk = message_data[bytes_sent : bytes_sent + chunk_size]
-
-                # For chunks after the first one, wait for ACK first
-                if bytes_sent > 0:
-                    print(f"Waiting for chunk {chunk_num-1} ACK...")
-                    if not self.wait_for_ack():
-                        print(f"Failed to get chunk {chunk_num-1} ACK")
-                        return False
-
-                print(f"Sending message chunk {chunk_num}: {chunk_size} bytes")
-                self.uart.send_bytes(chunk)
-                bytes_sent += chunk_size
-                chunk_num += 1
-
-            print("✓ All data sent successfully!")
-            print("Verify operation completed. Check firmware output for results.")
-
-            # Give some time to see any firmware responses
-            time.sleep(2)
-            self.uart.flush_received_data()
-
-            return True
-
-        except Exception as e:
-            print(f"❌ Error during verify operation: {e}")
-            return False
-
 
 def main():
-    import sys
 
     port = 4327
+    sec_level = 2
+    vector_index = 0
+
+    print(f"\n=== Testing Dilithium Verify (Security Level {sec_level} ===")
+    # Create test suite
+    tester = DilithiumTester()
+
+    print(f"Loading test vectors {vector_index} from files...")
+    test_vectors = TestVectorReader.load_dilithium_vectors(
+        base_path=os.path.join(os.getcwd(), "test", "KAT"),
+        sec_level=sec_level,
+        vector_index=vector_index,
+    )
+
+    # Create UART connection
+    uart = UARTConnection(port=port, max_wait=600)
+
+    success = tester.test_verify_operation(
+        sec_level=sec_level, test_vectors=test_vectors, uart_conn=uart
+    )
+    print(f"\n{'✅ Test passed!' if success else '❌ Test failed!'}")
+
+    return
+
     if len(sys.argv) > 1:
         port = int(sys.argv[1])
 
