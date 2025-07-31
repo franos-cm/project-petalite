@@ -2,6 +2,15 @@ import socket
 import time
 import threading
 import queue
+from typing import List
+
+from utils import (
+    DILITHIUM_ACK_BYTE,
+    DILITHIUM_READY_BYTE,
+    DILITHIUM_SYNC_BYTE,
+    DILITHIUM_START_BYTE,
+    BASE_ACK_GROUP_LENGTH,
+)
 
 
 class UARTConnection:
@@ -99,19 +108,9 @@ class UARTConnection:
                 if self.running:
                     print(f"[WRITE ERROR] {e}")
 
-    def send_byte(self, byte_val):
-        """Send a single byte"""
-        self.send_queue.put(byte_val)
-
     def send_bytes(self, data):
         """Send multiple bytes"""
         self.send_queue.put(data)
-
-    def send_command(self, command):
-        """Send a text command (for compatibility with original interface)"""
-        if not command.endswith("\n"):
-            command += "\n"
-        self.send_queue.put(command)
 
     def get_received_data(self, timeout=0.1):
         """Get any received data (non-blocking)"""
@@ -128,11 +127,11 @@ class UARTConnection:
 
         return received
 
-    def wait_for_byte(self, expected_byte, timeout=5):
+    def _wait_for_byte(self, expected_byte, signal_name: str = "", timeout=5):
         """Wait for a specific byte value"""
-        start_time = time.time()
+        start_time = time.perf_counter()
 
-        while time.time() - start_time < timeout:
+        while time.perf_counter() - start_time < timeout:
             try:
                 item = self.received_data.get(timeout=0.1)
                 msg_type, data, timestamp = item
@@ -140,7 +139,13 @@ class UARTConnection:
                 if msg_type == "data" and data:
                     for byte in data:
                         if byte == expected_byte:
+                            if signal_name:
+                                elapsed = time.perf_counter() - start_time
+                                print(
+                                    f"[{signal_name.upper()}] Received in {elapsed:.3f} seconds"
+                                )
                             return True
+
                 elif msg_type == "error":
                     print(f"[ERROR] {data}")
                     return False
@@ -148,23 +153,21 @@ class UARTConnection:
             except queue.Empty:
                 continue
 
+        print(f"[TIMEOUT] No ACK received in {timeout:.3f} seconds")
         return False
 
-    def wait_for_bytes(self, num_bytes, timeout=5):
+    def _wait_for_bytes(self, num_bytes, timeout=5):
         """Wait for specific number of bytes"""
-        start_time = time.time()
+        start_time = time.perf_counter()
         buffer = b""
 
-        while time.time() - start_time < timeout:
+        while time.perf_counter() - start_time < timeout:
             try:
                 item = self.received_data.get(timeout=0.1)
                 msg_type, data, timestamp = item
 
                 if msg_type == "data":
                     buffer += data
-
-                    if self.debug:
-                        print(f"[BUFFER] {buffer.hex()}")
 
                     if len(buffer) >= num_bytes:
                         result = buffer[:num_bytes]
@@ -179,32 +182,61 @@ class UARTConnection:
 
         return buffer if buffer else None
 
-    def wait_for_text(self, expected_text, timeout=30, show_debug=True):
-        """Wait for specific text to appear (for text-based protocols)"""
-        print(f"Waiting for '{expected_text}'...")
-        buffer = ""
-        start_time = time.time()
+    def wait_for_ack(self, timeout=120):
+        return self._wait_for_byte(
+            expected_byte=DILITHIUM_ACK_BYTE, signal_name="ACK", timeout=timeout
+        )
 
-        while time.time() - start_time < timeout:
-            data_items = self.get_received_data(timeout=0.5)
+    def wait_for_ready(self, timeout=120):
+        return self._wait_for_byte(
+            expected_byte=DILITHIUM_READY_BYTE, signal_name="READY", timeout=timeout
+        )
 
-            for item_type, data, timestamp in data_items:
-                if item_type == "data":
-                    # Decode bytes to string for text matching
-                    try:
-                        text = data.decode("utf-8", errors="ignore")
-                        buffer += text
-                        if show_debug:
-                            print(f"[TEXT] {repr(text)}")
+    def wait_for_start(self, timeout=120):
+        return self._wait_for_byte(
+            expected_byte=DILITHIUM_START_BYTE, signal_name="START", timeout=timeout
+        )
 
-                        if expected_text in buffer:
-                            return True
-                    except:
-                        pass
-                elif item_type == "error":
-                    return False
+    def get_response_header(self, timeout=1200):
+        self.wait_for_start()
+        self.send_ack()
+        response_header = self._wait_for_bytes(num_bytes=4, timeout=timeout)
+        print("AAAAAAAA")
+        print(response_header)
+        self.send_ack()
+        return response_header
 
-        return False
+    def send_ack(self):
+        print(f"\t[ACK] Sending ACK...")
+        self.send_bytes(DILITHIUM_ACK_BYTE)
+
+    def send_sync(self):
+        print(f"\t[SYNC] Sending SYNC...")
+        self.send_bytes(DILITHIUM_SYNC_BYTE)
+
+    def send_start(self):
+        print(f"\t[START] Sending START...")
+        self.send_bytes(DILITHIUM_START_BYTE)
+
+    def send_in_chunks(
+        self,
+        data: List[bytes],
+        chunk_size: int = BASE_ACK_GROUP_LENGTH,
+        data_name: str = "",
+    ):
+        total_chunks = (len(data) + chunk_size - 1) // chunk_size
+        for chunk_num in range(total_chunks):
+            start = chunk_num * chunk_size
+            end = start + chunk_size
+            data_chunk = data[start:end]
+
+            print(
+                f"\tSending {data_name}({chunk_num+1}/{total_chunks}), ({len(data_chunk)} bytes): {data_chunk[:8].hex()}..."
+            )
+            self.send_bytes(data_chunk)
+            if not self.wait_for_ack():
+                print(f"Failed to get {data_name} ({chunk_num+1}) ACK")
+                return False
 
     def flush_received_data(self):
         """Show any remaining received data"""

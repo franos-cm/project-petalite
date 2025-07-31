@@ -10,19 +10,10 @@
 #include <generated/mem.h>
 
 #include "uart_utils.h"
-#include "dilithium_utils.h"
-#include "dilithium_sizes.h"
-
-// NOTE: this should be 64 bit aligned
-extern uint8_t _dilithium_buffer_start[];
-
-static inline uint32_t align8(uint32_t x)
-{
-	return (x + 7) & ~7;
-}
+#include "dilithium.h"
 
 // TODO: do I really need to align the read length for dma?
-static int handle_verify(uint8_t sec_level, uint32_t msg_len)
+int handle_verify(uint8_t sec_level, uint32_t msg_len)
 {
 	int z_len = get_z_len(sec_level);
 	int t1_len = get_t1_len(sec_level);
@@ -42,18 +33,18 @@ static int handle_verify(uint8_t sec_level, uint32_t msg_len)
 	const uintptr_t result_addr = base_buffer_addr;
 
 	// NOTE: load happens in the specific order defined by the Dilthium core used
-	int base_ack_group_length = 64;
 	// Read Rho
+	uart_send_ack();
 	uart_readn((volatile uint8_t *)rho_addr, DILITHIUM_RHO_SIZE, DILITHIUM_RHO_SIZE);
 	// Read C
 	uart_send_ack();
 	uart_readn((volatile uint8_t *)c_addr, DILITHIUM_C_SIZE, DILITHIUM_C_SIZE);
 	// Read Z
 	uart_send_ack();
-	uart_readn((volatile uint8_t *)z_addr, z_len, base_ack_group_length);
+	uart_readn((volatile uint8_t *)z_addr, z_len, BASE_ACK_GROUP_LENGTH);
 	// Read T1
 	uart_send_ack();
-	uart_readn((volatile uint8_t *)t1_addr, t1_len, base_ack_group_length);
+	uart_readn((volatile uint8_t *)t1_addr, t1_len, BASE_ACK_GROUP_LENGTH);
 	// Write mlen
 	for (int i = 0; i < 4; i++)
 		((volatile uint8_t *)mlen_addr)[i] = 0x00;
@@ -69,7 +60,7 @@ static int handle_verify(uint8_t sec_level, uint32_t msg_len)
 
 	// Read H
 	uart_send_ack();
-	uart_readn((volatile uint8_t *)h_addr, h_len, base_ack_group_length);
+	uart_readn((volatile uint8_t *)h_addr, h_len, BASE_ACK_GROUP_LENGTH);
 
 	// Ingest the entire message in chunks.
 	int message_bytes_read = 0;
@@ -84,7 +75,7 @@ static int handle_verify(uint8_t sec_level, uint32_t msg_len)
 
 		// For chunks 2 and onwards, we must first ACK the previously received chunk.
 		uart_send_ack();
-		uart_readn((volatile uint8_t *)msg_chunk_addr, current_chunk_size, base_ack_group_length);
+		uart_readn((volatile uint8_t *)msg_chunk_addr, current_chunk_size, BASE_ACK_GROUP_LENGTH);
 
 		// Pass the newly read chunk to the DMA.
 		dilithium_read_setup((uint64_t)msg_chunk_addr, align8(current_chunk_size));
@@ -113,25 +104,29 @@ static int handle_verify(uint8_t sec_level, uint32_t msg_len)
 	rsp.sec_lvl = sec_level;
 	rsp.rsp_code = 0;
 	rsp.verify_res = (result == 0);
+
+	// Send response and wait for ACK
+	uart_transmission_handshake();
 	uart_send_response(&rsp);
+	uart_wait_for_ack();
 
 	return 0;
 }
 
 static void process_command(void)
 {
-	dilithium_header_t header = uart_parse_request_header();
+	uart_send_ack();
+	dilithium_request_t header = uart_parse_request_header();
 	int invalid_header_code = invalid_header(&header);
 	if (invalid_header_code)
 		// TODO: Make it so it returns the error code in the uart
 		return;
-	uart_send_ack();
 
 	dilithium_reset();
 	dilithium_setup(header.cmd, header.sec_lvl);
 	if (header.cmd == DILITHIUM_CMD_KEYGEN)
 	{
-		return;
+		handle_keygen(header.sec_lvl);
 	}
 	else if (header.cmd == DILITHIUM_CMD_SIGN)
 	{
@@ -152,14 +147,17 @@ int main(void)
 	uart_init();
 	dilithium_init();
 
-	do
+	// Initial handshake should be SYNC(host)-READY(uart)
+	// Then data transfer handshake should be START-ACK-HEADER-ACK-DATA-ACK
+	while (1)
 	{
-		uart_send_ready();
-	} while (!readchar_nonblock());
-
-	if (getchar() == DILITHIUM_START_BYTE)
-	{
-		uart_send_ack();
-		process_command();
+		if (readchar_nonblock())
+		{
+			uint8_t signal = getchar();
+			if (signal == DILITHIUM_SYNC_BYTE)
+				uart_send_ready();
+			else if (signal == DILITHIUM_START_BYTE)
+				process_command();
+		}
 	}
 }

@@ -1,4 +1,5 @@
 import os
+from typing import List, Dict
 
 
 class TestVectorReader:
@@ -36,26 +37,39 @@ class TestVectorReader:
             return []
 
     @staticmethod
-    def load_dilithium_vectors(base_path, sec_level, vector_index=0):
+    def load_dilithium_vectors(
+        base_path, sec_level, initial_vec_index=0, vec_num=1
+    ) -> Dict[int, Dict[str, List[bytes]]]:
         """Load all Dilithium test vectors for a specific test case"""
-        vectors = {}
+        vectors = {
+            i: dict() for i in range(initial_vec_index, initial_vec_index + vec_num)
+        }
 
         # Define the files for each component
         files = {
-            "rho": os.path.join(base_path, "shared", "rho.txt"),
-            "msg": os.path.join(base_path, "shared", "msg.txt"),
+            "k": os.path.join(base_path, "shared", "k.txt"),
             "msg_len": os.path.join(base_path, "shared", "msg_len.txt"),
+            "msg": os.path.join(base_path, "shared", "msg.txt"),
+            "rho": os.path.join(base_path, "shared", "rho.txt"),
+            "seed": os.path.join(base_path, "shared", "seed.txt"),
             "c": os.path.join(base_path, str(sec_level), "c.txt"),
-            "z": os.path.join(base_path, str(sec_level), "z.txt"),
-            "t1": os.path.join(base_path, str(sec_level), "t1.txt"),
             "h": os.path.join(base_path, str(sec_level), "h.txt"),
+            "s1": os.path.join(base_path, str(sec_level), "s1.txt"),
+            "s2": os.path.join(base_path, str(sec_level), "s2.txt"),
+            "t0": os.path.join(base_path, str(sec_level), "t0.txt"),
+            "t1": os.path.join(base_path, str(sec_level), "t1.txt"),
+            "tr": os.path.join(base_path, str(sec_level), "tr.txt"),
+            "z": os.path.join(base_path, str(sec_level), "z.txt"),
         }
 
         # Load each component
         for component, filename in files.items():
             data = TestVectorReader.read_hex_file(filename)
-            vectors[component] = data[vector_index]
-            print(f"Loaded {component}: {len(vectors[component])} bytes")
+            for index, vals in vectors.items():
+                vals[component] = data[index]
+            print(
+                f"Loaded {component} for vectors {initial_vec_index} to {initial_vec_index+vec_num}"
+            )
 
         return vectors
 

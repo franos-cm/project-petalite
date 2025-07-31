@@ -1,3 +1,5 @@
+from enum import StrEnum
+
 # Size constants (converted from hex to decimal for readability)
 DILITHIUM_SIZES_DICT = {
     # H component sizes
@@ -26,7 +28,22 @@ DILITHIUM_CMD_SIGN = 0x02
 DILITHIUM_CHUNK_SIZE = 256
 DILITHIUM_MAX_MSG_LEN = 8192
 
+DILITHIUM_SYNC_BYTE = 0xB0
 DILITHIUM_READY_BYTE = 0xA0
 DILITHIUM_ACK_BYTE = 0xCC
 DILITHIUM_START_BYTE = 0xAC
-DILITHIUM_END_BYTE = 0xA1
+BASE_ACK_GROUP_LENGTH = 64
+
+
+class DilithiumOp(StrEnum):
+    KEYGEN = "KEYGEN"
+    SIGN = "SIGN"
+    VERIFY = "VERIFY"
+
+
+class ResponseHeader:
+    def __init__(self, bytestream):
+        self.cmd = bytestream[0]
+        self.sec_lvl = bytestream[1]
+        self.rsp_code = bytestream[2]
+        self.verify_res = bytestream[3]
