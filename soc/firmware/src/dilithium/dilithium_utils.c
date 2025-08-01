@@ -1,6 +1,6 @@
 #include "dilithium_utils.h"
 
-int invalid_header(dilithium_header_t *dh)
+int invalid_header(dilithium_request_t *dh)
 {
     // Validate security level
     if (dh->sec_lvl != 2 && dh->sec_lvl != 3 && dh->sec_lvl != 5)
@@ -16,11 +16,7 @@ int invalid_header(dilithium_header_t *dh)
 
 void dilithium_init(void)
 {
-    dilithium_reset_write(1);
-    dilithium_start_write(0);
-    dilithium_reader_enable_write(0);
-    dilithium_writer_enable_write(0);
-    dilithium_reset_write(0);
+    dilithium_reset();
 }
 
 void dilithium_setup(uint8_t op, uint16_t sec_level)
@@ -38,6 +34,9 @@ void dilithium_start(void)
 void dilithium_reset(void)
 {
     dilithium_reset_write(1);
+    dilithium_start_write(0);
+    dilithium_reader_enable_write(0);
+    dilithium_writer_enable_write(0);
     dilithium_reset_write(0);
 }
 

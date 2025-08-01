@@ -62,6 +62,8 @@ class PetaliteCore(SoCCore):
         self.add_id()
         self.add_io()
         self.add_dilithium()
+        if self.is_simulated:
+            self.add_config("SIM")
         if debug_bridge:
             self.add_etherbone_bridge()
 
@@ -198,7 +200,7 @@ def main():
             ),
             trace=args.trace,
             trace_fst=args.trace,
-            trace_start=18_850_000_000 if args.trace else None,  # (in ns)
+            trace_start=18_800_000_000 if args.trace else 0,  # (in ns)
         )
 
     else:

@@ -17,32 +17,13 @@ int get_sig_len(uint8_t lvl)
 
 int get_pk_len(uint8_t lvl)
 {
-    switch (lvl)
-    {
-    case 2:
-        return DILITHIUM_PK_LVL2_SIZE;
-    case 3:
-        return DILITHIUM_PK_LVL3_SIZE;
-    case 5:
-        return DILITHIUM_PK_LVL5_SIZE;
-    default:
-        return -1;
-    }
+    return (DILITHIUM_RHO_SIZE + get_t1_len(lvl));
 }
 
 int get_sk_len(uint8_t lvl)
 {
-    switch (lvl)
-    {
-    case 2:
-        return DILITHIUM_SK_LVL2_SIZE;
-    case 3:
-        return DILITHIUM_SK_LVL3_SIZE;
-    case 5:
-        return DILITHIUM_SK_LVL5_SIZE;
-    default:
-        return -1;
-    }
+    return (
+        DILITHIUM_RHO_SIZE + DILITHIUM_K_SIZE + DILITHIUM_TR_SIZE + get_s1_len(lvl) + get_s2_len(lvl) + get_t0_len(lvl));
 }
 
 int get_h_len(uint8_t lvl)
