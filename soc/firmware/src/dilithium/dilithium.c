@@ -160,37 +160,5 @@ int handle_keygen(uint8_t sec_level)
 
 int handle_sign(uint8_t sec_level, uint32_t msg_len)
 {
-    const uintptr_t seed_addr = (uintptr_t)_dilithium_buffer_start;
-    const uintptr_t keypair_addr = seed_addr + align8(DILITHIUM_SEED_SIZE);
-    int payload_size = get_pk_len(sec_level) + get_sk_len(sec_level);
-
-    get_seed((volatile uint8_t *)seed_addr);
-    uart_send_ack();
-
-    dilithium_write_setup((uint64_t)keypair_addr, payload_size);
-    dilithium_write_start();
-    dilithium_read_setup((uint64_t)seed_addr, DILITHIUM_SEED_SIZE);
-    dilithium_read_start();
-
-    dilithium_start();
-    dilithium_read_wait();
-    dilithium_write_wait();
-
-    // Construct response
-    dilithium_response_t rsp;
-    rsp.cmd = DILITHIUM_CMD_KEYGEN;
-    rsp.sec_lvl = sec_level;
-    rsp.rsp_code = 0;
-    rsp.verify_res = -1;
-
-    // Send response and wait for ACK
-    uart_transmission_handshake();
-    uart_send_response(&rsp);
-    uart_wait_for_ack();
-
-    // Send data
-    uart_sendn((volatile uint8_t *)keypair_addr, payload_size, BASE_ACK_GROUP_LENGTH);
-    uart_wait_for_ack();
-
-    return 0;
+    ;
 }

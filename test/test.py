@@ -20,9 +20,11 @@ class DilithiumTester:
         pass
 
     def pre_op_handshake(self):
-        self.uart.send_sync()
-        self.uart.wait_for_ready()
+        while not self.uart.wait_for_ready(timeout=1):
+            self.uart.send_sync()
         self.uart.send_start()
+        if not self.uart.wait_for_ack():
+            raise RuntimeError("Did not get START ACK")
 
     def send_request_header(self, cmd, msg_len: int, sec_level: int):
         # Step 2: Send header (cmd + sec_lvl + msg_len)
