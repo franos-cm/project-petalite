@@ -2,9 +2,6 @@
 #define DILITHIUM_H
 
 #include <stdint.h>
-#include <stdio.h>
-#include <libbase/uart.h>
-#include <libbase/console.h>
 #include "dilithium_sizes.h"
 #include "dilithium_utils.h"
 #include "uart_utils.h"

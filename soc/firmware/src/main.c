@@ -1,14 +1,4 @@
-#include <stdio.h>
-#include <stdlib.h>
-#include <string.h>
-#include <stdint.h>
-
 #include <irq.h>
-#include <libbase/uart.h>
-#include <libbase/console.h>
-#include <generated/csr.h>
-#include <generated/mem.h>
-
 #include "uart_utils.h"
 #include "dilithium.h"
 
@@ -50,9 +40,9 @@ int main(void)
 	// Then data transfer handshake should be START-ACK-HEADER-ACK-DATA-ACK
 	while (1)
 	{
-		if (readchar_nonblock())
+		if (uart_read_nonblock())
 		{
-			uint8_t signal = getchar();
+			uint8_t signal = uart_read();
 			if (signal == DILITHIUM_SYNC_BYTE)
 				uart_send_ready();
 			else if (signal == DILITHIUM_START_BYTE)

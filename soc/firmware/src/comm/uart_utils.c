@@ -2,30 +2,30 @@
 
 inline void uart_send_ack(void)
 {
-    putchar(DILITHIUM_ACK_BYTE);
+    uart_write(DILITHIUM_ACK_BYTE);
 }
 
 inline void uart_send_ready(void)
 {
-    putchar(DILITHIUM_READY_BYTE);
+    uart_write(DILITHIUM_READY_BYTE);
 }
 
 inline void uart_send_start(void)
 {
-    putchar(DILITHIUM_START_BYTE);
+    uart_write(DILITHIUM_START_BYTE);
 }
 
 inline dilithium_request_t uart_parse_request_header(void)
 {
     dilithium_request_t header;
 
-    header.cmd = getchar();
-    header.sec_lvl = getchar();
+    header.cmd = uart_read();
+    header.sec_lvl = uart_read();
 
-    header.msg_len = ((uint32_t)getchar()) << 0;
-    header.msg_len |= ((uint32_t)getchar()) << 8;
-    header.msg_len |= ((uint32_t)getchar()) << 16;
-    header.msg_len |= ((uint32_t)getchar()) << 24;
+    header.msg_len = ((uint32_t)uart_read()) << 0;
+    header.msg_len |= ((uint32_t)uart_read()) << 8;
+    header.msg_len |= ((uint32_t)uart_read()) << 16;
+    header.msg_len |= ((uint32_t)uart_read()) << 24;
 
     return header;
 }
@@ -39,7 +39,7 @@ int uart_readn(volatile uint8_t *dst, uint32_t total_len, uint32_t ack_group_len
     uint32_t ack_counter = 0;
     for (uint32_t i = 0; i < total_len; i++)
     {
-        dst[i] = getchar();
+        dst[i] = uart_read();
 
         if (ack_group_length > 0)
         {
@@ -64,7 +64,7 @@ int uart_sendn(volatile uint8_t *src, uint32_t total_len, uint32_t ack_group_len
     uint32_t ack_counter = 0;
     for (uint32_t i = 0; i < total_len; i++)
     {
-        putchar(src[i]);
+        uart_write(src[i]);
 
         if (ack_group_length > 0)
         {
@@ -83,7 +83,7 @@ int uart_sendn(volatile uint8_t *src, uint32_t total_len, uint32_t ack_group_len
 
 inline void uart_wait_for_ack(void)
 {
-    while (getchar() != DILITHIUM_ACK_BYTE)
+    while (uart_read() != DILITHIUM_ACK_BYTE)
         ;
 }
 
@@ -95,8 +95,8 @@ void uart_transmission_handshake(void)
 
 void uart_send_response(const dilithium_response_t *rsp)
 {
-    putchar(rsp->cmd);
-    putchar(rsp->sec_lvl);
-    putchar(rsp->rsp_code);
-    putchar(rsp->verify_res);
+    uart_write(rsp->cmd);
+    uart_write(rsp->sec_lvl);
+    uart_write(rsp->rsp_code);
+    uart_write(rsp->verify_res);
 }

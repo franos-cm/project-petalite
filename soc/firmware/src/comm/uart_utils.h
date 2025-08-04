@@ -2,9 +2,7 @@
 #define UART_UTILS_H
 
 #include <stdint.h>
-#include <stdio.h>
 #include <libbase/uart.h>
-#include <libbase/console.h>
 #include "dilithium_utils.h"
 
 #define BASE_ACK_GROUP_LENGTH 64

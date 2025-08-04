@@ -97,7 +97,7 @@ class DilithiumTester:
             # Give some time to see any firmware responses
             print("Waiting for response...")
             rsp = ResponseHeader(self.uart.get_response_header())
-            print("Verify operation completed. Check firmware output for results.")
+            print("Keygen operation completed. Check firmware output for results.")
 
             # Give some time to see any firmware responses
             rsp_data = self.uart.receive_in_chunks(
@@ -160,7 +160,7 @@ class DilithiumTester:
             self.compare("tr", test_vector["tr"], tr_received, mismatches)
 
             if mismatches:
-                with open("keygen_mismatches_alt.txt", "w") as f:
+                with open("keygen_mismatches.txt", "w") as f:
                     for name, expected, received in mismatches:
                         f.write(f"[{name.upper()}] Expected:\n{expected.hex()}\n")
                         f.write(f"[{name.upper()}] Received:\n{received.hex()}\n\n")
