@@ -201,8 +201,6 @@ class UARTConnection:
         self.wait_for_start()
         self.send_ack()
         response_header = self._wait_for_bytes(num_bytes=4, timeout=timeout)
-        print("AAAAAAAA")
-        print(response_header)
         self.send_ack()
         return response_header
 
@@ -237,6 +235,70 @@ class UARTConnection:
             if not self.wait_for_ack():
                 print(f"Failed to get {data_name} ({chunk_num+1}) ACK")
                 return False
+
+    def receive_in_chunks(
+        self,
+        total_bytes: int,
+        chunk_size: int = BASE_ACK_GROUP_LENGTH,
+        data_name: str = "",
+        timeout_per_chunk: int = 15,
+    ):
+        """Receive a large amount of data in chunks, sending an ACK after each chunk.
+
+        Args:
+            total_bytes (int): The total number of bytes to receive.
+            chunk_size (int): The size of each chunk to receive.
+            data_name (str): A descriptive name for the data being received (for logging).
+            timeout_per_chunk (int): The timeout in seconds for receiving each chunk.
+
+        Returns:
+            bytes: The complete data received, or None if the operation failed or timed out.
+        """
+        full_data = b""
+        total_chunks = (total_bytes + chunk_size - 1) // chunk_size
+
+        if data_name:
+            print(
+                f"\tReceiving {data_name} ({total_bytes} bytes) in {total_chunks} chunks..."
+            )
+
+        for chunk_num in range(total_chunks):
+            bytes_to_receive = min(chunk_size, total_bytes - len(full_data))
+
+            if self.debug:
+                print(
+                    f"\tReceiving {data_name} chunk ({chunk_num + 1}/{total_chunks}), waiting for {bytes_to_receive} bytes..."
+                )
+
+            # Wait for the next chunk of data
+            data_chunk = self._wait_for_bytes(
+                num_bytes=bytes_to_receive, timeout=timeout_per_chunk
+            )
+
+            if not data_chunk or len(data_chunk) < bytes_to_receive:
+                print(
+                    f"❌ Failed to receive {data_name} chunk ({chunk_num + 1}). Timed out."
+                )
+                return None
+
+            full_data += data_chunk
+
+            # Acknowledge receipt of the chunk
+            self.send_ack()
+            if self.debug:
+                print(f"\t✅ ACK'd chunk {chunk_num + 1}/{total_chunks}")
+
+        if len(full_data) == total_bytes:
+            if data_name:
+                print(
+                    f"✅ Successfully received all {total_bytes} bytes of {data_name}."
+                )
+            return full_data
+        else:
+            print(
+                f"❌ Error: Expected {total_bytes} bytes, but received {len(full_data)}."
+            )
+            return None
 
     def flush_received_data(self):
         """Show any remaining received data"""

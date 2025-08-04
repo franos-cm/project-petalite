@@ -13,6 +13,7 @@ void get_seed(volatile uint8_t *seed_buffer)
 #ifdef CONFIG_SIM
     /* simulation-specific behavior */
     uart_readn((volatile uint8_t *)seed_buffer, DILITHIUM_SEED_SIZE, BASE_ACK_GROUP_LENGTH);
+    uart_send_ack();
     return;
 #else
     /* hardware-specific behavior */
@@ -123,12 +124,15 @@ int handle_verify(uint8_t sec_level, uint32_t msg_len)
 
 int handle_keygen(uint8_t sec_level)
 {
+    // Header ack
+    uart_send_ack();
+
     const uintptr_t seed_addr = (uintptr_t)_dilithium_buffer_start;
     const uintptr_t keypair_addr = seed_addr + align8(DILITHIUM_SEED_SIZE);
-    int payload_size = get_pk_len(sec_level) + get_sk_len(sec_level);
+    // NOTE: both pk and sk have Rho, but it is only output once by the module, so we subtract it
+    int payload_size = get_pk_len(sec_level) + get_sk_len(sec_level) - DILITHIUM_RHO_SIZE;
 
     get_seed((volatile uint8_t *)seed_addr);
-    uart_send_ack();
 
     dilithium_write_setup((uint64_t)keypair_addr, payload_size);
     dilithium_write_start();
@@ -153,6 +157,7 @@ int handle_keygen(uint8_t sec_level)
 
     // Send data
     uart_sendn((volatile uint8_t *)keypair_addr, payload_size, BASE_ACK_GROUP_LENGTH);
+
     uart_wait_for_ack();
 
     return 0;
@@ -160,5 +165,5 @@ int handle_keygen(uint8_t sec_level)
 
 int handle_sign(uint8_t sec_level, uint32_t msg_len)
 {
-    ;
+    return 0;
 }

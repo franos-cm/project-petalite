@@ -11,6 +11,7 @@
 
 int handle_verify(uint8_t sec_level, uint32_t msg_len);
 int handle_keygen(uint8_t sec_level);
+int handle_sign(uint8_t sec_level, uint32_t msg_len);
 void get_seed(volatile uint8_t *seed_buffer);
 uint32_t align8(uint32_t x);
 

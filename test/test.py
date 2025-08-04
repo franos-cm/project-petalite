@@ -79,21 +79,105 @@ class DilithiumTester:
     def test_keygen_operation(self, test_vector: dict):
         """Test the complete Dilithium verify operation"""
         try:
+            rho_size = len(test_vector["rho"])
+            t1_size = len(test_vector["t1"])
+            k_size = len(test_vector["k"])
+            tr_size = len(test_vector["tr"])
+            s1_size = len(test_vector["s1"])
+            s2_size = len(test_vector["s2"])
+            t0_size = len(test_vector["t0"])
+            payload_size = (
+                rho_size + t1_size + k_size + tr_size + s1_size + s2_size + t0_size
+            )
+
             # Send seed
             self.uart.send_in_chunks(test_vector["seed"], data_name="SEED")
             print("✓ All data sent successfully!")
 
             # Give some time to see any firmware responses
-            self.uart.wait_for_bytes(num_bytes=10000, timeout=1200)
-            print("TIMEOUT")
-
-            self.uart.flush_received_data()
+            print("Waiting for response...")
+            rsp = ResponseHeader(self.uart.get_response_header())
             print("Verify operation completed. Check firmware output for results.")
-            return True
+
+            # Give some time to see any firmware responses
+            rsp_data = self.uart.receive_in_chunks(
+                total_bytes=payload_size, timeout_per_chunk=120
+            )
+            self.uart.flush_received_data()
+
+            # TODO: change this, too ugly
+            rho_received = rsp_data[:rho_size]
+            k_received = rsp_data[rho_size : rho_size + k_size]
+            s1_received = rsp_data[rho_size + k_size : rho_size + k_size + s1_size]
+            s2_received = rsp_data[
+                rho_size + k_size + s1_size : rho_size + k_size + s1_size + s2_size
+            ]
+            t1_received = rsp_data[
+                rho_size
+                + k_size
+                + s1_size
+                + s2_size : rho_size
+                + k_size
+                + s1_size
+                + s2_size
+                + t1_size
+            ]
+            t0_received = rsp_data[
+                rho_size
+                + k_size
+                + s1_size
+                + s2_size
+                + t1_size : rho_size
+                + k_size
+                + s1_size
+                + s2_size
+                + t1_size
+                + t0_size
+            ]
+            tr_received = rsp_data[
+                rho_size
+                + k_size
+                + s1_size
+                + s2_size
+                + t1_size
+                + t0_size : rho_size
+                + k_size
+                + s1_size
+                + s2_size
+                + t1_size
+                + t0_size
+                + tr_size
+            ]
+
+            # Check vals and write mismatches to file
+            mismatches = []
+            self.compare("rho", test_vector["rho"], rho_received, mismatches)
+            self.compare("k", test_vector["k"], k_received, mismatches)
+            self.compare("s1", test_vector["s1"], s1_received, mismatches)
+            self.compare("s2", test_vector["s2"], s2_received, mismatches)
+            self.compare("t1", test_vector["t1"], t1_received, mismatches)
+            self.compare("t0", test_vector["t0"], t0_received, mismatches)
+            self.compare("tr", test_vector["tr"], tr_received, mismatches)
+
+            if mismatches:
+                with open("keygen_mismatches_alt.txt", "w") as f:
+                    for name, expected, received in mismatches:
+                        f.write(f"[{name.upper()}] Expected:\n{expected.hex()}\n")
+                        f.write(f"[{name.upper()}] Received:\n{received.hex()}\n\n")
+                print(f"❌ Mismatches detected! Written to keygen_mismatches.txt")
+                success = False
+            else:
+                success = True
+                return success
 
         except Exception as e:
             print(f"❌ Error during verify operation: {e}")
             return False
+
+    def compare(self, name, expected, received, res_list):
+        if expected != received:
+            print(f"Mismatch between expected and received [{name}]")
+            res_list.append((name, expected, received))
 
     def test(
         self,
@@ -153,7 +237,7 @@ class DilithiumTester:
 def main():
     print(f"\n=== Testing Dilithium ===")
     port = 4327
-    dilithium_op = DilithiumOp.VERIFY
+    dilithium_op = DilithiumOp.KEYGEN
     sec_level = 2
     initial_vec_index = 0
     vec_num = 1
