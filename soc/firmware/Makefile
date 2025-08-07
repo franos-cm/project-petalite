@@ -2,13 +2,15 @@ ifndef SRC_DIR
 $(error SRC_DIR is not set. Pass it as an environment variable or make argument, e.g., make SRC_DIR=host)
 endif
 BUILD_DIR?=../build-soc/
-C_FILES := $(wildcard $(SRC_DIR)/*.c)
+C_FILES := $(shell find $(SRC_DIR) -name '*.c')
 OBJECTS := $(C_FILES:.c=.o)
 OBJECTS += crt0.o
 
 # SOC_DIRECTORY?=../tools/litex/litex/litex/soc/
 include $(BUILD_DIR)/software/include/generated/variables.mak
 include $(SOC_DIRECTORY)/software/common.mak
+
+CFLAGS += $(patsubst %,-I%,$(shell find $(SRC_DIR) -type d))
 
 ifdef WITH_CXX
 	CFLAGS += -DWITH_CXX

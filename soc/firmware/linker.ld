@@ -44,6 +44,16 @@ SECTIONS
 		_edata = .;
 	} > sram AT > main_ram
 
+	.dilithium_buffer :
+	{
+		. = ALIGN(8);
+		_dilithium_buffer_start = .;
+		*(.dilithium_buffer)
+		*(.dilithium_buffer.*)
+		. = ALIGN(8);
+		_dilithium_buffer_end = .;
+	} > dilithium_buffer
+
 	.bss :
 	{
 		. = ALIGN(8);

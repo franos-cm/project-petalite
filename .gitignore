@@ -15,3 +15,4 @@ dilithium-vivado/*
 sim
 *xpr
 soc/firmware/src_*
+.vscode

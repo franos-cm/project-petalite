@@ -5,7 +5,7 @@ from litex.soc.cores.dna import DNA
 from litex.soc.cores.dma import WishboneDMAReader, WishboneDMAWriter
 from litex.soc.integration.builder import Builder
 from litex.soc.integration.soc_core import SoCCore
-from litex.soc.interconnect.csr import CSRStorage
+from litex.soc.integration.common import get_mem_data
 from litex.soc.interconnect import wishbone
 
 from litex.build.sim import SimPlatform
@@ -14,6 +14,10 @@ from litex.build.generic_platform import GenericPlatform
 
 from liteeth.phy.model import LiteEthPHYModel
 from liteeth.common import convert_ip
+
+from litespi.phy.model import LiteSPIPHYModel
+from litespi.modules import S25FL128L
+from litespi.opcodes import SpiNorFlashOpCodes as Codes
 
 from dilithium import Dilithium
 from platforms import PetaliteSimPlatform
@@ -25,16 +29,16 @@ class PetaliteCore(SoCCore):
 
     def __init__(
         self,
-        comm_protocol: CommProtocol,
         platform: GenericPlatform,
         sys_clk_freq: int,
-        integrated_rom_init: str | list = [],
-        clk_domain_name: str = None,
+        comm_protocol: CommProtocol,
+        integrated_rom_init: str = None,
+        nvm_mem_init: str = None,
+        debug_bridge: bool = False,
         trace: bool = False,
     ):
         self.platform_instance = platform
         self.is_simulated = isinstance(platform, SimPlatform)
-        self.clk_domain_name = clk_domain_name
         self.comm_protocol = comm_protocol
 
         # SoC with CPU
@@ -61,9 +65,18 @@ class PetaliteCore(SoCCore):
         self.setup_clk()
         self.add_id()
         self.add_io()
+        # self.add_nvm_mem(nvm_mem_init=nvm_mem_init)
         self.add_dilithium()
+        if self.is_simulated:
+            self.add_config("SIM")
+        if debug_bridge:
+            self.add_etherbone_bridge()
 
+        # Simulation debugging ----------------------------------------------------------------------
         if trace:
+            trace_reset_on = True
+            self.platform_instance.add_debug(self, reset=1 if trace_reset_on else 0)
+        else:
             self.comb += self.platform_instance.trace.eq(1)
 
     def setup_clk(self: SoCCore):
@@ -106,22 +119,25 @@ class PetaliteCore(SoCCore):
         self.add_csr("dilithium_reader")
         self.add_csr("dilithium_writer")
 
-        self.start = CSRStorage(1)
-        self.mode = CSRStorage(2)
-        self.sec_lvl = CSRStorage(3)
-        self.add_csr("start")
-        self.add_csr("mode")
-        self.add_csr("sec_lvl")
-
         self.submodules.dilithium = Dilithium()
-
+        self.add_csr("dilithium")
         self.comb += [
             self.dilithium_reader.source.connect(self.dilithium.sink),
             self.dilithium.source.connect(self.dilithium_writer.sink),
-            self.dilithium.start.eq(self.start.storage),
-            self.dilithium.mode.eq(self.mode.storage),
-            self.dilithium.sec_lvl.eq(self.sec_lvl.storage),
         ]
+
+        # Add memory region for sig and pk
+        # NOTE: this puts the buffer inside of IO region
+        # I guess thats not ideal... but otherwise, the CPU was unable
+        # to access the given mem position, like 0x83000000.
+        # We also had to add an extra param to the add_ram method to account for that.
+        self.add_ram(
+            "dilithium_buffer",
+            origin=0x30000000,
+            size=10240,  # NOTE: 10 kB for sim, but final design could have 8 kB
+            mode="rw",
+            custom=True,
+        )
 
     def add_etherbone_bridge(self: SoCCore):
         self.ethphy = LiteEthPHYModel(self.platform.request("eth", 0))
@@ -138,6 +154,18 @@ class PetaliteCore(SoCCore):
             ethmac_address=0x10E2D5000000,
             ethmac_local_ip="192.168.1.50",
             ethmac_remote_ip="192.168.1.100",
+        )
+
+    def add_nvm_mem(self, nvm_mem_init: str):
+        # TODO: is it really big endianness?
+        spi_flash_init = get_mem_data(nvm_mem_init, endianness="big")
+        spiflash_module = S25FL128L(Codes.READ_1_1_4)
+        self.spiflash_phy = LiteSPIPHYModel(spiflash_module, init=spi_flash_init)
+        self.add_spi_flash(
+            phy=self.spiflash_phy,
+            mode="4x",
+            module=spiflash_module,
+            with_master=True,
         )
 
 
@@ -159,6 +187,7 @@ def main():
         comm_protocol=args.comm,
         integrated_rom_init=args.firmware,
         trace=args.trace,
+        debug_bridge=args.debug_bridge,
     )
 
     # Building stage
@@ -170,7 +199,12 @@ def main():
         sim_config = SimConfig()
         sim_config.add_clocker("sys_clk", freq_hz=args.sys_clk_freq)
         if args.comm == CommProtocol.UART:
-            sim_config.add_module("serial2console", "serial")
+            sim_config.add_module("serial2tcp", ("serial", 0), args={"port": 4327})
+
+        if args.debug_bridge:
+            sim_config.add_module(
+                "ethernet", "eth", args={"interface": "tap0", "ip": "192.168.1.100"}
+            )
 
         builder.build(
             run=args.load,
@@ -183,6 +217,7 @@ def main():
             ),
             trace=args.trace,
             trace_fst=args.trace,
+            trace_start=18_800_000_000 if args.trace else 0,  # (in ns)
         )
 
     else:
