@@ -5,6 +5,7 @@ from litex.soc.cores.dna import DNA
 from litex.soc.cores.dma import WishboneDMAReader, WishboneDMAWriter
 from litex.soc.integration.builder import Builder
 from litex.soc.integration.soc_core import SoCCore
+from litex.soc.integration.common import get_mem_data
 from litex.soc.interconnect import wishbone
 
 from litex.build.sim import SimPlatform
@@ -13,6 +14,10 @@ from litex.build.generic_platform import GenericPlatform
 
 from liteeth.phy.model import LiteEthPHYModel
 from liteeth.common import convert_ip
+
+from litespi.phy.model import LiteSPIPHYModel
+from litespi.modules import S25FL128L
+from litespi.opcodes import SpiNorFlashOpCodes as Codes
 
 from dilithium import Dilithium
 from platforms import PetaliteSimPlatform
@@ -24,17 +29,16 @@ class PetaliteCore(SoCCore):
 
     def __init__(
         self,
-        comm_protocol: CommProtocol,
         platform: GenericPlatform,
         sys_clk_freq: int,
-        integrated_rom_init: str | list = [],
-        clk_domain_name: str = None,
+        comm_protocol: CommProtocol,
+        integrated_rom_init: str = None,
+        nvm_mem_init: str = None,
         debug_bridge: bool = False,
         trace: bool = False,
     ):
         self.platform_instance = platform
         self.is_simulated = isinstance(platform, SimPlatform)
-        self.clk_domain_name = clk_domain_name
         self.comm_protocol = comm_protocol
 
         # SoC with CPU
@@ -61,6 +65,7 @@ class PetaliteCore(SoCCore):
         self.setup_clk()
         self.add_id()
         self.add_io()
+        # self.add_nvm_mem(nvm_mem_init=nvm_mem_init)
         self.add_dilithium()
         if self.is_simulated:
             self.add_config("SIM")
@@ -129,7 +134,7 @@ class PetaliteCore(SoCCore):
         self.add_ram(
             "dilithium_buffer",
             origin=0x30000000,
-            size=0x2000,
+            size=10240,  # NOTE: 10 kB for sim, but final design could have 8 kB
             mode="rw",
             custom=True,
         )
@@ -149,6 +154,18 @@ class PetaliteCore(SoCCore):
             ethmac_address=0x10E2D5000000,
             ethmac_local_ip="192.168.1.50",
             ethmac_remote_ip="192.168.1.100",
+        )
+
+    def add_nvm_mem(self, nvm_mem_init: str):
+        # TODO: is it really big endianness?
+        spi_flash_init = get_mem_data(nvm_mem_init, endianness="big")
+        spiflash_module = S25FL128L(Codes.READ_1_1_4)
+        self.spiflash_phy = LiteSPIPHYModel(spiflash_module, init=spi_flash_init)
+        self.add_spi_flash(
+            phy=self.spiflash_phy,
+            mode="4x",
+            module=spiflash_module,
+            with_master=True,
         )
 
 

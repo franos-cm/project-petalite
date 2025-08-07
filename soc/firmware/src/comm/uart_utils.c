@@ -59,7 +59,7 @@ int uart_readn(volatile uint8_t *dst, uint32_t total_len, uint32_t ack_group_len
 int uart_sendn(volatile uint8_t *src, uint32_t total_len, uint32_t ack_group_length)
 {
     if (ack_group_length > total_len)
-        return UART_ERR_INVALID_ARGS;
+        ack_group_length = total_len;
 
     uint32_t ack_counter = 0;
     for (uint32_t i = 0; i < total_len; i++)

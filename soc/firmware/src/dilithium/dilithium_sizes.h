@@ -3,11 +3,6 @@
 
 #include <stdint.h>
 
-// TODO: change these if used
-#define DILITHIUM_SIG_LVL2_SIZE 0x5000
-#define DILITHIUM_SIG_LVL3_SIZE 0x5000
-#define DILITHIUM_SIG_LVL5_SIZE 0x5000
-
 #define DILITHIUM_H_LVL2_SIZE 84
 #define DILITHIUM_H_LVL3_SIZE 61
 #define DILITHIUM_H_LVL5_SIZE 83

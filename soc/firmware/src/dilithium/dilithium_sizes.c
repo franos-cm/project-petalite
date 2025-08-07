@@ -2,17 +2,7 @@
 
 int get_sig_len(uint8_t lvl)
 {
-    switch (lvl)
-    {
-    case 2:
-        return DILITHIUM_SIG_LVL2_SIZE;
-    case 3:
-        return DILITHIUM_SIG_LVL3_SIZE;
-    case 5:
-        return DILITHIUM_SIG_LVL5_SIZE;
-    default:
-        return -1;
-    }
+    return DILITHIUM_C_SIZE + get_z_len(lvl) + get_h_len(lvl);
 }
 
 int get_pk_len(uint8_t lvl)

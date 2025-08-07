@@ -19,7 +19,7 @@ static void process_command(void)
 	}
 	else if (header.cmd == DILITHIUM_CMD_SIGN)
 	{
-		return;
+		handle_sign(header.sec_lvl, header.msg_len);
 	}
 	else if (header.cmd == DILITHIUM_CMD_VERIFY)
 	{
@@ -35,6 +35,7 @@ int main(void)
 #endif
 	uart_init();
 	dilithium_init();
+	uart_send_ready();
 
 	// Initial handshake should be SYNC(host)-READY(uart)
 	// Then data transfer handshake should be START-ACK-HEADER-ACK-DATA-ACK

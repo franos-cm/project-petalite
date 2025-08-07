@@ -3,11 +3,10 @@
 
 #include <stdint.h>
 #include <libbase/uart.h>
-#include "dilithium_utils.h"
+#include "shared.h"
 
 #define BASE_ACK_GROUP_LENGTH 64
 #define UART_OK 0
-#define UART_ERR_INVALID_ARGS -1
 
 dilithium_request_t uart_parse_request_header(void);
 void uart_send_ready(void);

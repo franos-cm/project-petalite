@@ -20,7 +20,8 @@ class DilithiumTester:
         pass
 
     def pre_op_handshake(self):
-        while not self.uart.wait_for_ready(timeout=1):
+        self.uart.send_sync()
+        while not self.uart.wait_for_ready(timeout=5):
             self.uart.send_sync()
         self.uart.send_start()
         if not self.uart.wait_for_ack():
@@ -168,7 +169,66 @@ class DilithiumTester:
                 success = False
             else:
                 success = True
-                return success
+            return success
+
+        except Exception as e:
+            print(f"❌ Error during verify operation: {e}")
+            return False
+
+    def test_sign_operation(self, test_vector: dict):
+        """Test the complete Dilithium sign operation"""
+        try:
+            # Secret key payload
+            sk_payload = (
+                test_vector["rho"]
+                + test_vector["k"]
+                + test_vector["tr"]
+                + test_vector["s1"]
+                + test_vector["s2"]
+                + test_vector["t0"]
+            )
+
+            # Send sk
+            self.uart.send_in_chunks(sk_payload, data_name="SK")
+
+            # Send msg
+            msg_len = int(test_vector["msg_len"].hex(), 16)
+            self.uart.send_in_chunks(test_vector["msg"][:msg_len], data_name="MSG")
+            print("✓ All data sent successfully!")
+
+            # Give some time to see any firmware responses
+            print("Waiting for response...")
+            rsp = ResponseHeader(self.uart.get_response_header())
+            print("Sign operation completed. Check firmware output for results.")
+
+            # Give some time to see any firmware responses
+            c_received = self.uart.receive_in_chunks(
+                total_bytes=len(test_vector["c"]), timeout_per_chunk=120
+            )
+            z_received = self.uart.receive_in_chunks(
+                total_bytes=len(test_vector["z"]), timeout_per_chunk=120
+            )
+            h_received = self.uart.receive_in_chunks(
+                total_bytes=len(test_vector["h"]), timeout_per_chunk=120
+            )
+            self.uart.flush_received_data()
+
+            # Check vals and write mismatches to file
+            mismatches = []
+            self.compare("z", test_vector["z"], z_received, mismatches)
+            self.compare("h", test_vector["h"], h_received, mismatches)
+            self.compare("c", test_vector["c"], c_received, mismatches)
+
+            if mismatches:
+                with open("sign_mismatches.txt", "w") as f:
+                    for name, expected, received in mismatches:
+                        f.write(f"[{name.upper()}] Expected:\n{expected.hex()}\n")
+                        f.write(f"[{name.upper()}] Received:\n{received.hex()}\n\n")
+                print(f"❌ Mismatches detected! Written to sign_mismatches.txt")
+                success = False
+            else:
+                success = True
+            return success
 
         except Exception as e:
             print(f"❌ Error during verify operation: {e}")
@@ -211,7 +271,7 @@ class DilithiumTester:
                     msg_len=test_vector["msg_len"],
                     sec_level=sec_level,
                 )
-                result = self.test_verify_operation(test_vector=test_vector)
+                result = self.test_sign_operation(test_vector=test_vector)
             elif operation == DilithiumOp.VERIFY:
                 self.send_request_header(
                     DILITHIUM_CMD_VERIFY,
@@ -237,7 +297,7 @@ class DilithiumTester:
 def main():
     print(f"\n=== Testing Dilithium ===")
     port = 4327
-    dilithium_op = DilithiumOp.KEYGEN
+    dilithium_op = DilithiumOp.SIGN
     sec_level = 2
     initial_vec_index = 0
     vec_num = 1
