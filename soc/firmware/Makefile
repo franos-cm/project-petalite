@@ -86,9 +86,12 @@ W_RANLIB_PATH := $(shell command -v $(W_RANLIB))
 WOLFSSL_CFG_DIR := $(abspath wolfssl)
 
 
-WOLFSSL_CFLAGS  := $(CFLAGS) -ffreestanding -fno-builtin -Wno-error=cpp -DHAVE_SYS_TIME_H \
-                   -I$(WOLFSSL_CFG_DIR)
+WOLFSSL_CFLAGS  := $(CFLAGS)
+WOLFSSL_CFLAGS  += -Os -ffunction-sections -fdata-sections -flto -ffreestanding -fno-builtin
+WOLFSSL_CFLAGS  += -DHAVE_SYS_TIME_H -I$(WOLFSSL_CFG_DIR)
+WOLFSSL_CFLAGS  += -Wno-error=cpp
 WOLFSSL_LDFLAGS ?= $(LDFLAGS)
+WOLFSSL_LDFLAGS  += -Wl,--gc-sections -Wl,--icf=all -flto
 
 wolfssl:
 	@rm -rf "$(WOLFSSL_BUILD)"  # kill cache so options take effect
@@ -108,23 +111,15 @@ wolfssl:
 	    -DCMAKE_INSTALL_PREFIX="$(WOLFSSL_INSTALL)" \
 	    -DBUILD_SHARED_LIBS=OFF \
 	    -DWOLFSSL_USER_SETTINGS=ON \
-	    -DWOLFSSL_CRYPT_ONLY=ON \
-	    -DWOLFSSL_OPENSSLEXTRA=ON \
-	    -DWOLFSSL_FILESYSTEM=OFF \
-	    -DWOLFSSL_SINGLE_THREADED=ON \
-	    -DWOLFSSL_ECC=ON -DWOLFSSL_AES=ON -DWOLFSSL_SHA=ON \
-	    -DWOLFSSL_EXAMPLES=OFF -DWOLFSSL_CRYPT_TESTS=OFF \
-	    -DWOLFSSL_SP=OFF
-#         -DWOLFSSL_PKCS12=OFF \
-#         -DWOLFSSL_PWDBASED=OFF \
-#         -DWOLFSSL_MD5=OFF \
-# 		-DWOLFSSL_RSA=OFF \
-#         -DWOLFSSL_ASN=OFF
+		-DWOLFSSL_CRYPT_ONLY=ON \
+	    -DWOLFSSL_EXAMPLES=OFF \
+		-DWOLFSSL_CRYPT_TESTS=OFF
 	cmake --build "$(WOLFSSL_BUILD)" --target wolfssl -j$$(nproc)
 	cmake --install "$(WOLFSSL_BUILD)"
 
 wolfssl-clean:
 	$(RM) -r "$(WOLFSSL_BUILD)" "$(WOLFSSL_INSTALL)"
+	$(RM) -r "wolfssl"
 
 show-flags:
 	@echo "CC             = $(CC)"
