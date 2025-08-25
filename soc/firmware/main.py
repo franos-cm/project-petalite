@@ -34,6 +34,8 @@ def main():
         default="main_ram",
         help="Memory Region where code will be loaded/executed.",
     )
+    parser.add_argument("--wolf", action="store_true", help="Build only wolfSSL.")
+    parser.add_argument("--clean-wolf", action="store_true", help="Build only wolfSSL.")
     args = parser.parse_args()
 
     firmware_bin = args.firmware_name + ".bin"
@@ -57,6 +59,26 @@ def main():
         if os.path.isabs(args.build_path)
         else os.path.join("..", args.build_path)
     )
+
+    if args.clean_wolf:
+        cmd = (
+            f"BUILD_DIR='{build_path}' "
+            f"WOLFSSL_STRICT_BM=1 "
+            f"SRC_DIR='{args.src_dir}' "
+            f"make -C '{args.output_dir}' wolfssl-clean"
+        )
+        os.system(cmd)
+        return
+
+    if args.wolf:
+        cmd = (
+            f"BUILD_DIR='{build_path}' "
+            f"WOLFSSL_STRICT_BM=1 "
+            f"SRC_DIR='{args.src_dir}' "
+            f"make -C '{args.output_dir}' wolfssl"
+        )
+        os.system(cmd)
+        return
 
     os.system(
         f"export BUILD_DIR={build_path} FIRMWARE_NAME={args.firmware_name} "
