@@ -80,7 +80,7 @@ puts $::env(LM_LICENSE_FILE)
 # Commands
 export PATH="/tools/verilator/v5.036-48-g0dc93c1d5/bin:$PATH"
 ./soc/petalite.py --sim --io-json=./soc/data/io_sim.json --build-dir=./builds/build-soc --trace --debug-bridge
-./soc/firmware/main.py  --build-path=./builds/build-soc --output-dir=build-firmware --firmware-name=firmware --mem=rom
+./soc/firmware/main.py  --build-path=./builds/build-soc --output-dir=build-firmware --firmware-name=firmware --mem=rom --wolf=True
 ./soc/petalite.py --sim --io-json=./soc/data/io_sim.json --build-dir=./builds/build-soc --compile-gateware --firmware=build-firmware/firmware.bin --load --trace --debug-bridge
 litex_server --udp --udp-ip=192.168.1.50
 litex_cli --csr-csv="./builds/build-soc/csr.csv" --regs

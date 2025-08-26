@@ -7,19 +7,10 @@ static volatile uint32_t bytes_collected = 0;
 static volatile uint32_t expected_cmd_len = 0;
 
 // ---- Helpers ----
-static inline uint32_t be32_read(const uint8_t *p)
-{
-    // TPM marshaling is big-endian ("MSB first")
-    return ((uint32_t)p[0] << 24) |
-           ((uint32_t)p[1] << 16) |
-           ((uint32_t)p[2] << 8) |
-           ((uint32_t)p[3] << 0);
-}
-
 // Where commandSize lives inside the header (offset 2, length 4)
 static inline uint32_t header_extract_command_size(const uint8_t *hdr)
 {
-    return be32_read(&hdr[2]);
+    return be32(&hdr[2]);
 }
 
 static void receiver_reset(void)
@@ -120,12 +111,12 @@ bool inline receiver_ingestion_done(void)
     return (rx_state == RX_COMMAND_READY) || (rx_state == RX_ERROR);
 }
 
-uint32_t read_command()
+uint32_t read_command(volatile uint8_t *priv_buffer)
 {
     if (rx_state != RX_COMMAND_READY)
         return rx_code;
 
-    memcpy(tpm_cmd_private_buf, tpm_cmd_shared_buf, bytes_collected);
+    memcpy(priv_buffer, tpm_cmd_shared_buf, bytes_collected);
 
     // Optional: re-enable RX if you masked it in ISR
     // uint32_t en = uart_ev_enable_read();

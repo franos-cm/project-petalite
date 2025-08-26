@@ -17,7 +17,6 @@
 
 // NOTE: this should be 64 bit aligned
 extern volatile uint8_t tpm_cmd_shared_buf[TPM_MAX_CMD_LEN];
-extern volatile uint8_t tpm_cmd_private_buf[TPM_MAX_CMD_LEN];
 
 // ---- Simple assembler state machine ----
 typedef enum

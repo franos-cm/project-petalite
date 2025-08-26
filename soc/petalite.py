@@ -62,7 +62,9 @@ class PetaliteCore(SoCCore):
             # integrated_main_ram_size=0x1_0000,  # TODO: cant use main_ram because of SBI...
         )
 
+        self.setup_mem_map()
         self.setup_clk()
+
         self.add_id()
         self.add_io()
         # self.add_nvm_mem(nvm_mem_init=nvm_mem_init)
@@ -83,6 +85,26 @@ class PetaliteCore(SoCCore):
         if self.is_simulated:
             self.crg = CRG(self.platform_instance.request("sys_clk"))
 
+    def setup_mem_map(self: SoCCore):
+        # Simple IO memory bump-allocator
+        self._io_base = 0x3000_0000  # start of your IO window
+        self._io_limit = 0x3001_0000  # optional safety limit (64 KiB here)
+        self._io_cur = self._io_base
+
+    # --- super simple helper: sequential, aligned, non-overlapping ---
+    def add_io_buffer(self, name: str, size: int, align: int = 8, **ram_kwargs):
+        # align up
+        origin = (self._io_cur + (align - 1)) & ~(align - 1)
+        end = origin + size
+        if self._io_limit is not None and end > self._io_limit:
+            raise ValueError(
+                f"IO space exhausted adding '{name}': "
+                f"need 0x{size:X} at 0x{origin:X}, limit 0x{self._io_limit:X}"
+            )
+        self.add_ram(name, origin=origin, size=size, **ram_kwargs)
+        self._io_cur = end
+        return origin
+
     def add_id(self: SoCCore):
         if not self.is_simulated:
             self.submodules.dna = DNA()
@@ -92,10 +114,20 @@ class PetaliteCore(SoCCore):
         if self.comm_protocol == CommProtocol.PCIE:
             pass
         elif self.comm_protocol == CommProtocol.UART:
-            if self.is_simulated:
-                self.add_uart(uart_name="sim")
-            else:
-                self.add_uart(uart_name="serial")
+            self.add_uart(uart_name="sim" if self.is_simulated else "serial")
+            # Add io buffers for receiving commands
+            self.add_io_buffer(
+                name="tpm_cmd_shared_buffer",
+                size=4 * 1024,
+                mode="rw",
+                custom=True,
+            )
+            self.add_io_buffer(
+                name="tpm_cmd_private_buffer",
+                size=4 * 1024,
+                mode="rw",
+                custom=True,
+            )
         else:
             raise RuntimeError()
 
@@ -127,14 +159,14 @@ class PetaliteCore(SoCCore):
         ]
 
         # Add memory region for sig and pk
+        # TODO: check this IO region stuff later
         # NOTE: this puts the buffer inside of IO region
         # I guess thats not ideal... but otherwise, the CPU was unable
         # to access the given mem position, like 0x83000000.
         # We also had to add an extra param to the add_ram method to account for that.
-        self.add_ram(
-            "dilithium_buffer",
-            origin=0x30000000,
-            size=10240,  # NOTE: 10 kB for sim, but final design could have 8 kB
+        self.add_io_buffer(
+            name="dilithium_buffer",
+            size=10 * 1024,  # NOTE: 10 kB for sim, but final design could have 8 kB
             mode="rw",
             custom=True,
         )
