@@ -1,0 +1,3 @@
+[submodule "firmware/tpm-ref-src"]
+	path = firmware/tpm-ref-src
+	url = https://github.com/franos-cm/ms-tpm-20-ref.git
