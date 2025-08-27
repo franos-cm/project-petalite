@@ -1,6 +1,3 @@
-[submodule "firmware/ms-tpm-20-ref"]
-	path = firmware/ms-tpm-20-ref
-	url = https://github.com/franos-cm/ms-tpm-20-ref.git
 [submodule "firmware/wolfssl"]
 	path = firmware/wolfssl
 	url = https://github.com/wolfSSL/wolfssl.git
