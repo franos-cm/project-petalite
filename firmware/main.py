@@ -1,119 +1,150 @@
 #!/usr/bin/env python3
-
+import argparse
 import os
 import sys
 import shutil
-import argparse
-from litex.build.tools import replace_in_file
+import subprocess
+from pathlib import Path
+from contextlib import contextmanager
+from litex.build.tools import replace_in_file  # use LiteX helper
+
+# ---------- helpers ----------
+
+
+def run(cmd, cwd=None, env=None):
+    print("+ " + " ".join(cmd), flush=True)
+    subprocess.run(cmd, cwd=cwd, env=env, check=True)
+
+
+@contextmanager
+def maybe_patch_linker(ld_path: Path, mem_name: str):
+    """
+    Temporarily rewrite 'main_ram' -> mem_name in linker.ld for the build,
+    then restore the original file afterwards. NOP if mem_name == 'main_ram'.
+    """
+    if not ld_path.exists() or mem_name == "main_ram":
+        yield
+        return
+    original = ld_path.read_text()
+    replace_in_file(str(ld_path), "main_ram", mem_name)
+    try:
+        yield
+    finally:
+        ld_path.write_text(original)
+
+
+def make_env(build_dir: Path, firmware_name: str):
+    env = os.environ.copy()
+    env["BUILD_DIR"] = str(build_dir)
+    env["FIRMWARE_NAME"] = firmware_name
+    return env
+
+
+def copy_artifacts(fw_dir: Path, out_dir: Path, firmware_name: str, make_fbi: bool):
+    out_dir.mkdir(parents=True, exist_ok=True)
+    binf = fw_dir / f"{firmware_name}.bin"
+    if not binf.exists():
+        print(f"error: expected {binf} not found", file=sys.stderr)
+        sys.exit(1)
+    shutil.copy2(binf, out_dir / binf.name)
+    if make_fbi:
+        py = sys.executable or "python3"
+        fbi = out_dir / f"{firmware_name}.fbi"
+        run(
+            [
+                py,
+                "-m",
+                "litex.soc.software.crcfbigen",
+                str(out_dir / binf.name),
+                "-o",
+                str(fbi),
+                "--fbi",
+                "--little",
+            ]
+        )
+
+
+# ---------- CLI ----------
+
+
+def add_common(sp):
+    sp.add_argument("--build-path", default="builds/build-soc")
+    sp.add_argument("--firmware-name", default="firmware")
+    default_fwdir = Path(__file__).parent
+    sp.add_argument("--fw-dir", default=default_fwdir)
 
 
 def main():
-    parser = argparse.ArgumentParser(description="Petalite Firmware Parser.")
-    parser.add_argument(
-        "--src-dir",
-        default="src",
-        help="Source directory to compile, relative to soc/firmware/.",
-    )
-    parser.add_argument(
-        "--build-path",
-        required=True,
-        help="Target's build path (e.g., build/board_name).",
-    )
-    parser.add_argument(
-        "--output-dir",
-        default="build-firmware",
-        help="Output directory for build files (default: firmware/).",
-    )
-    parser.add_argument(
-        "--firmware-name",
-        help="Name of the firmware binary (without extension, e.g., petalite_firmware).",
-    )
-    parser.add_argument("--with-cxx", action="store_true", help="Enable CXX support.")
-    parser.add_argument(
-        "--mem",
-        default="main_ram",
-        help="Memory Region where code will be loaded/executed.",
-    )
-    parser.add_argument("--wolf", action="store_true", help="Build only wolfSSL.")
-    parser.add_argument("--clean-wolf", action="store_true", help="Build only wolfSSL.")
-    args = parser.parse_args()
+    p = argparse.ArgumentParser(description="Firmware helper (Makefile wrapper).")
+    sub = p.add_subparsers(dest="cmd", required=True)
 
-    firmware_bin = args.firmware_name + ".bin"
-    firmware_fbi = args.firmware_name + ".fbi"
+    # existing
+    sp_build = sub.add_parser("build", help="Build firmware (.bin); copy artifacts")
+    add_common(sp_build)
+    sp_build.add_argument("--mem", default="main_ram")
+    sp_build.add_argument("--output-dir", default="build-firmware")
+    sp_build.add_argument("--fbi", action="store_true")
 
-    # Create output directory
-    os.makedirs(args.output_dir, exist_ok=True)
+    sp_wolf = sub.add_parser("wolfssl", help="Build/install wolfSSL only")
+    add_common(sp_wolf)
+    sp_cw = sub.add_parser("clean-wolf", help="Clean wolfSSL build/install")
+    add_common(sp_cw)
+    sp_clean = sub.add_parser("clean", help="Run 'make clean'")
+    add_common(sp_clean)
+    sp_show = sub.add_parser("show", help="Run 'make show'")
+    add_common(sp_show)
+    sp_show_inc = sub.add_parser("show-includes", help="Run 'make show-includes'")
+    add_common(sp_show_inc)
+    sp_cc_inc = sub.add_parser("cc-include-search", help="Run 'make cc-include-search'")
+    add_common(sp_cc_inc)
 
-    # Copy contents to output directory
-    os.system(f"cp {os.path.abspath(os.path.dirname(__file__))}/* {args.output_dir} -r")
-    os.system(
-        f"chmod -R u+w {args.output_dir}"
-    )  # Nix specific: Allow linker script to be modified.
+    # NEW: show-cflags
+    sp_show_cflags = sub.add_parser("show-cflags", help="Run 'make show-cflags'")
+    add_common(sp_show_cflags)
 
-    # Update memory region in linker script
-    replace_in_file(os.path.join(args.output_dir, "linker.ld"), "main_ram", args.mem)
+    args = p.parse_args()
 
-    # Compile the project
-    build_path = (
-        args.build_path
-        if os.path.isabs(args.build_path)
-        else os.path.join("..", args.build_path)
-    )
-
-    if args.clean_wolf:
-        cmd = (
-            f"BUILD_DIR='{build_path}' "
-            f"WOLFSSL_STRICT_BM=1 "
-            f"SRC_DIR='{args.src_dir}' "
-            f"make -C '{args.output_dir}' wolfssl-clean"
-        )
-        os.system(cmd)
-        return
-
-    if args.wolf:
-        cmd = (
-            f"BUILD_DIR='{build_path}' "
-            f"WOLFSSL_STRICT_BM=1 "
-            f"SRC_DIR='{args.src_dir}' "
-            f"make -C '{args.output_dir}' wolfssl"
-        )
-        os.system(cmd)
-        return
-
-    os.system(
-        f"export BUILD_DIR={build_path} FIRMWARE_NAME={args.firmware_name} "
-        f"SRC_DIR={args.src_dir} && {'export WITH_CXX=1 &&' if args.with_cxx else ''} "
-        f"cd {args.output_dir} && make"
-    )
-
-    # Rename and copy the binary output
-    compiled_bin = os.path.join(args.output_dir, args.firmware_name + ".bin")
-    if os.path.exists(compiled_bin):
-        os.rename(compiled_bin, os.path.join(args.output_dir, firmware_bin))
+    fw_dir = Path(args.fw_dir).resolve()
+    if os.path.isabs(args.build_path):
+        build_dir = Path(args.build_path).resolve()
     else:
-        print(f"Error: Expected compiled binary {compiled_bin} not found.")
-        sys.exit(1)
+        build_dir = (fw_dir.parent / args.build_path).resolve()
 
-    # Prepare flash boot image
-    python3 = (
-        sys.executable or "python3"
-    )  # Nix specific: reuse current Python executable if available.
-    os.system(
-        f"{python3} -m litex.soc.software.crcfbigen {os.path.join(args.output_dir, firmware_bin)} -o {os.path.join(args.output_dir, firmware_fbi)} --fbi --little"
-    )  # FIXME: Endianness.
+    env = make_env(build_dir, args.firmware_name)
 
-    # Clean up unnecessary files (keep only .bin, .fbi, and linker.ld)
-    for filename in os.listdir(args.output_dir):
-        if not (
-            filename == firmware_bin
-            or filename == firmware_fbi
-            or filename == "linker.ld"
-        ):
-            filepath = os.path.join(args.output_dir, filename)
-            if os.path.isfile(filepath):
-                os.remove(filepath)
-            elif os.path.isdir(filepath):
-                shutil.rmtree(filepath)
+    if args.cmd == "wolfssl":
+        run(["make", "wolfssl"], cwd=fw_dir, env=env)
+        return
+    if args.cmd == "clean-wolf":
+        run(["make", "wolfssl-clean"], cwd=fw_dir, env=env)
+        return
+    if args.cmd == "clean":
+        run(["make", "clean"], cwd=fw_dir, env=env)
+        return
+    if args.cmd == "show":
+        run(["make", "show"], cwd=fw_dir, env=env)
+        return
+    if args.cmd == "show-includes":
+        run(["make", "show-includes"], cwd=fw_dir, env=env)
+        return
+    if args.cmd == "cc-include-search":
+        run(["make", "cc-include-search"], cwd=fw_dir, env=env)
+        return
+    if args.cmd == "show-cflags":
+        run(["make", "show-cflags"], cwd=fw_dir, env=env)
+        return
+
+    if args.cmd == "build":
+        ld = fw_dir / "linker.ld"
+        with maybe_patch_linker(ld, args.mem):
+            run(["make"], cwd=fw_dir, env=env)
+        copy_artifacts(
+            fw_dir,
+            Path(args.output_dir).resolve(),
+            args.firmware_name,
+            make_fbi=args.fbi,
+        )
+        return
 
 
 if __name__ == "__main__":
