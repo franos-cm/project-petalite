@@ -1,6 +1,6 @@
 venv
 tools
-build*
+builds
 *.jou
 *.log
 *.str

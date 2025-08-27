@@ -68,7 +68,7 @@ def copy_artifacts(fw_dir: Path, out_dir: Path, firmware_name: str, make_fbi: bo
 
 
 def add_common(sp):
-    sp.add_argument("--build-path", default="builds/build-soc")
+    sp.add_argument("--build-path", default="builds/soc")
     sp.add_argument("--firmware-name", default="firmware")
     default_fwdir = Path(__file__).parent
     sp.add_argument("--fw-dir", default=default_fwdir)
@@ -101,6 +101,10 @@ def main():
     # NEW: show-cflags
     sp_show_cflags = sub.add_parser("show-cflags", help="Run 'make show-cflags'")
     add_common(sp_show_cflags)
+    sp_show_wolfssl_cflags = sub.add_parser(
+        "show-wolfssl-cflags", help="Run 'make show-cflags'"
+    )
+    add_common(sp_show_wolfssl_cflags)
 
     args = p.parse_args()
 
@@ -132,6 +136,9 @@ def main():
         return
     if args.cmd == "show-cflags":
         run(["make", "show-cflags"], cwd=fw_dir, env=env)
+        return
+    if args.cmd == "show-wolfssl-cflags":
+        run(["make", "show-wolfssl-cflags"], cwd=fw_dir, env=env)
         return
 
     if args.cmd == "build":
