@@ -2,12 +2,12 @@
 # Configs
 # =========================
 FIRMWARE_NAME        ?= firmware
+BUILD_DIR            ?= builds/soc
+WOLFSSL_BUILD_DIR    ?= builds/wolfssl
 APP_DIR              ?= $(abspath src)
 WOLFSSL_SRC_DIR      ?= $(abspath wolfssl)
-WOLFSSL_BUILD_DIR    := $(abspath wolfssl-build)
-WOLFSSL_INSTALL_DIR  := $(abspath $(BUILD_DIR)/software/wolfssl)
 TPM_SRC_DIR          := $(abspath ms-tpm-20-ref/TPMCmd/tpm)
-BUILD_DIR            ?= builds/build-soc
+WOLFSSL_INSTALL_DIR  := $(abspath $(BUILD_DIR)/software/wolfssl)
 
 
 # =========================
@@ -90,11 +90,11 @@ endif
 # Include paths
 # =========================
 INCLUDES += \
-	-I$(COMPAT_DIR) \
 	-I$(CONFIG_DIR) \
 	-I$(WOLFSSL_INC) \
-	-I$(TPM_INC) \
-	-I$(PLATFORM_DIR)
+	-I$(COMPAT_DIR) \
+	-I$(PLATFORM_DIR) \
+	-I$(TPM_INC)
 
 
 # =========================
@@ -103,7 +103,7 @@ INCLUDES += \
 CFLAGS += \
 	-DWOLFSSL_USER_SETTINGS \
 	-DHASH_LIB=Ossl -DSYM_LIB=Ossl -DBN_MATH_LIB=Ossl \
-	-ffreestanding -fno-builtin \
+	-nostdinc -ffreestanding -fno-builtin \
 	-ffunction-sections -fdata-sections \
 	-Os -g -std=gnu11 -Wall -Wextra -Werror
 LDFLAGS += -Wl,--gc-sections -Wl,-Map,$(FIRMWARE_NAME).elf.map
@@ -174,33 +174,45 @@ check-no-openssl: $(FIRMWARE_NAME).elf
 # =========================
 # wolfSSL build
 # =========================
-ifneq (,$(filter wolfssl wolfssl-clean,$(MAKECMDGOALS)))
+.PHONY: wolfssl-build wolfssl-clean
+ifneq (,$(filter wolfssl-build wolfssl-clean,$(MAKECMDGOALS)))
 
 ifeq ($(strip $(TARGET_PREFIX)),)
   $(error TARGET_PREFIX is empty; did you include LiteX's common.mak?)
 endif
 
-W_CC     = $(TARGET_PREFIX)gcc
-W_AR     = $(TARGET_PREFIX)gcc-ar
-W_RANLIB = $(TARGET_PREFIX)gcc-ranlib
+
+# Tool paths (absolute)
+W_CC_PATH     := $(shell command -v $(TARGET_PREFIX)gcc)
+W_AR_PATH     := $(shell command -v $(TARGET_PREFIX)gcc-ar)
+W_RANLIB_PATH := $(shell command -v $(TARGET_PREFIX)gcc-ranlib)
+ifeq ($(strip $(W_CC_PATH)$(W_AR_PATH)$(W_RANLIB_PATH)),)
+  $(error Could not find $(TARGET_PREFIX){gcc,gcc-ar,gcc-ranlib} on PATH)
+endif
 
 WOLFSSL_CFG_DIR := $(CONFIG_DIR)
-WOLFSSL_CFLAGS  := -I$(WOLFSSL_CFG_DIR) $(CFLAGS) -DHAVE_SYS_TIME_H -Wno-error=cpp
-WOLFSSL_LDFLAGS := $(LDFLAGS)
 
-.PHONY: wolfssl wolfssl-clean
-wolfssl:
+# Keep wolfSSL compile flags minimal and freestanding; avoid passing firmware LDFLAGS
+WOLFSSL_CFLAGS  := -I$(WOLFSSL_CFG_DIR) \
+                   -ffreestanding -fno-builtin \
+                   -ffunction-sections -fdata-sections \
+                   -Os -g -std=gnu11 -Wall -Wextra \
+                   -DWOLFSSL_USER_SETTINGS -DHAVE_SYS_TIME_H -Wno-error=cpp
+# No need for firmware link flags to build a static lib
+WOLFSSL_LDFLAGS :=
+
+wolfssl-build:
 	@rm -rf "$(WOLFSSL_BUILD_DIR)"
 	@mkdir -p "$(WOLFSSL_BUILD_DIR)" "$(WOLFSSL_INSTALL_DIR)"
 	cd "$(WOLFSSL_BUILD_DIR)" && \
-	  CC="$(W_CC)" AR="$(W_AR)" RANLIB="$(W_RANLIB)" \
+	  CC="$(W_CC_PATH)" AR="$(W_AR_PATH)" RANLIB="$(W_RANLIB_PATH)" \
 	  CFLAGS="$(WOLFSSL_CFLAGS)" LDFLAGS="$(WOLFSSL_LDFLAGS)" \
 	  cmake -S "$(WOLFSSL_SRC_DIR)" -B . \
 	    -DCMAKE_SYSTEM_NAME=Generic \
-	    -DCMAKE_C_COMPILER="$(W_CC)" \
-	    -DCMAKE_AR="$(W_AR)" \
-	    -DCMAKE_RANLIB="$(W_RANLIB)" \
-	    -DCMAKE_ASM_COMPILER="$(W_CC)" \
+	    -DCMAKE_C_COMPILER="$(W_CC_PATH)" \
+	    -DCMAKE_AR="$(W_AR_PATH)" \
+	    -DCMAKE_RANLIB="$(W_RANLIB_PATH)" \
+	    -DCMAKE_ASM_COMPILER="$(W_CC_PATH)" \
 	    -DCMAKE_C_FLAGS="$(WOLFSSL_CFLAGS)" \
 	    -DCMAKE_EXE_LINKER_FLAGS="$(WOLFSSL_LDFLAGS)" \
 	    -DCMAKE_TRY_COMPILE_TARGET_TYPE=STATIC_LIBRARY \
@@ -214,7 +226,7 @@ wolfssl:
 	cmake --install "$(WOLFSSL_BUILD_DIR)"
 
 wolfssl-clean:
-	$(RM) -r "$(WOLFSSL_BUILD_DIR)" "$(WOLFSSL_INSTALL_DIR)" "wolfssl"
+	$(RM) -r "$(WOLFSSL_BUILD_DIR)" "$(WOLFSSL_INSTALL_DIR)"
 
 endif
 

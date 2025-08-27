@@ -85,9 +85,9 @@ def main():
     sp_build.add_argument("--output-dir", default="build-firmware")
     sp_build.add_argument("--fbi", action="store_true")
 
-    sp_wolf = sub.add_parser("wolfssl", help="Build/install wolfSSL only")
+    sp_wolf = sub.add_parser("wolfssl-build", help="Build/install wolfSSL only")
     add_common(sp_wolf)
-    sp_cw = sub.add_parser("clean-wolf", help="Clean wolfSSL build/install")
+    sp_cw = sub.add_parser("wolfssl-clean", help="Clean wolfSSL build/install")
     add_common(sp_cw)
     sp_clean = sub.add_parser("clean", help="Run 'make clean'")
     add_common(sp_clean)
@@ -112,10 +112,10 @@ def main():
 
     env = make_env(build_dir, args.firmware_name)
 
-    if args.cmd == "wolfssl":
-        run(["make", "wolfssl"], cwd=fw_dir, env=env)
+    if args.cmd == "wolfssl-build":
+        run(["make", "wolfssl-build"], cwd=fw_dir, env=env)
         return
-    if args.cmd == "clean-wolf":
+    if args.cmd == "wolfssl-clean":
         run(["make", "wolfssl-clean"], cwd=fw_dir, env=env)
         return
     if args.cmd == "clean":

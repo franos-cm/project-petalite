@@ -91,17 +91,37 @@ class PetaliteCore(SoCCore):
         self._io_limit = 0x3001_0000  # optional safety limit (64 KiB here)
         self._io_cur = self._io_base
 
-    # --- super simple helper: sequential, aligned, non-overlapping ---
-    def add_io_buffer(self, name: str, size: int, align: int = 8, **ram_kwargs):
-        # align up
-        origin = (self._io_cur + (align - 1)) & ~(align - 1)
-        end = origin + size
+    def add_io_buffer(
+        self,
+        name: str,
+        size: int,
+        *,
+        custom: bool = True,
+        mode: str = "rw",
+        **ram_kwargs,
+    ):
+        def _next_pow2(x: int) -> int:
+            return 1 << (x - 1).bit_length()
+
+        # LiteX requires origin aligned to size rounded up to next power-of-two.
+        size_pow2 = _next_pow2(size)
+        required_al = max(8, size_pow2)  # keep at least 8-byte alignment
+
+        origin = (self._io_cur + (required_al - 1)) & ~(required_al - 1)
+        end = origin + size_pow2
+
         if self._io_limit is not None and end > self._io_limit:
             raise ValueError(
-                f"IO space exhausted adding '{name}': "
-                f"need 0x{size:X} at 0x{origin:X}, limit 0x{self._io_limit:X}"
+                f"IO space exhausted adding '{name}': need 0x{size_pow2:X} at 0x{origin:X}, "
+                f"limit 0x{self._io_limit:X}"
             )
-        self.add_ram(name, origin=origin, size=size, **ram_kwargs)
+
+        # You can pass the original 'size' (LiteX will log that it rounded),
+        # or pass size_pow2 to avoid the "rounded internally" info. Both are fine.
+        self.add_ram(
+            name, origin=origin, size=size, custom=custom, mode=mode, **ram_kwargs
+        )
+
         self._io_cur = end
         return origin
 
