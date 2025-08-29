@@ -1,5 +1,6 @@
 ## TODO
 Remember to check all prints Ive added to Litex build, since some of them change stuff (like rom loading)
+https://github.com/trustedcomputinggroup/tpm
 
 -- Starting litex
 mkdir project-petalite
@@ -88,6 +89,20 @@ gtkwave ./builds/soc/gateware/sim.fst
 
 
 ./firmware/main.py show 
+
+#Note:
+We need to implement the shims in tpm_to_platform_interface.h AND ONLY THOSE (as far as I can tell)
+There are other _plat funcs, but they are for simulation purposes.
+Actually... some of the ones in platform_public_interface need to be CONCEPTUALLY implemented
+That is, we might need to have StartUp implemented as deasserting the SoC reset for example.
+But the function calls themselves dont seem all that necessary?
+They also seem to implement vars (like s_isCanceled) that need to be signals in the SoC itself... we might need some HAL here
+About this last topic (s_isCanceled and such), ask Copilot to summarize it for me
+Finally, we need to wrap the TPM command with a one (?) byte header, so we can also transmit stuff needed for the side-band (i.e. Cancel request, Locality, _TPM_Hash_Start)
+That is, if we still want to use UART, which seems like the safer bet. Otherwise, we would have to deal with
+how to share a bus between the TPM and the host in Litex (which might be possible, but still), and that would break our
+qemu simulation architecture... so best to stick to UART.
+
 
 litex_sim --cpu-type=rocket --cpu-variant=small --bus-data-width=64 --no-compile-gateware
 litex_sim --cpu-type=rocket --cpu-variant=small --bus-data-width=64 --rom-init=build/sim/software/bios/bios.bin

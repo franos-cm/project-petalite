@@ -45,21 +45,13 @@ SECTIONS
 	} > sram AT > main_ram
 
 	/* TODO: revise if I need ALIGN at the end of each block */
-	.tpm_cmd_shared_buffer :
+	.tpm_cmd_buffer :
 	{
 		. = ALIGN(8);
-		tpm_cmd_shared_buf = .;
-		*(.tpm_cmd_shared_buffer)
-		*(.tpm_cmd_shared_buffer.*)
-	} > tpm_cmd_shared_buffer
-
-	.tpm_cmd_private_buffer :
-	{
-		. = ALIGN(8);
-		tpm_cmd_private_buf = .;
-		*(.tpm_cmd_private_buffer)
-		*(.tpm_cmd_private_buffer.*)
-	} > tpm_cmd_private_buffer
+		tpm_cmd_buf = .;
+		*(.tpm_cmd_buffer)
+		*(.tpm_cmd_buffer.*)
+	} > tpm_cmd_buffer
 
 	.dilithium_buffer :
 	{

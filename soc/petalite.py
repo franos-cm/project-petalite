@@ -137,13 +137,7 @@ class PetaliteCore(SoCCore):
             self.add_uart(uart_name="sim" if self.is_simulated else "serial")
             # Add io buffers for receiving commands
             self.add_io_buffer(
-                name="tpm_cmd_shared_buffer",
-                size=4 * 1024,
-                mode="rw",
-                custom=True,
-            )
-            self.add_io_buffer(
-                name="tpm_cmd_private_buffer",
+                name="tpm_cmd_buffer",
                 size=4 * 1024,
                 mode="rw",
                 custom=True,
