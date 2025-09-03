@@ -5,11 +5,12 @@ ROOT_DIR             := $(abspath ..)
 FIRMWARE_NAME        ?= firmware
 SOC_BUILD_DIR        ?= $(ROOT_DIR)/builds/soc
 WOLFSSL_BUILD_DIR    ?= $(ROOT_DIR)/builds/wolfssl
+TPM_BUILD_DIR        ?= $(ROOT_DIR)/builds/tpm
 FIRMWARE_BUILD_DIR   ?= $(ROOT_DIR)/builds/firmware
 LINKER_SCRIPT        ?= $(abspath linker.ld)
-APP_DIR              ?= $(abspath src)
+APP_DIR              ?= $(abspath core)
 WOLFSSL_SRC_DIR      ?= $(abspath wolfssl)
-TPM_SRC_DIR          := $(abspath ms-tpm-20-ref/TPMCmd/tpm)
+TPM_ROOT             := $(abspath ms-tpm-20-ref/TPMCmd)
 WOLFSSL_INSTALL_DIR  := $(abspath $(SOC_BUILD_DIR)/software/wolfssl)
 
 # =========================
@@ -19,34 +20,21 @@ COMPAT_DIR     := $(APP_DIR)/compat
 CONFIG_DIR     := $(APP_DIR)/config
 PLATFORM_DIR   := $(APP_DIR)/platform
 WOLFSSL_INC    := $(WOLFSSL_INSTALL_DIR)/include
+OSSL_INC       := $(WOLFSSL_INSTALL_DIR)/include/wolfssl
 WOLFSSL_LIB_A  := $(WOLFSSL_INSTALL_DIR)/lib/libwolfssl.a
-TPM_INC        := $(TPM_SRC_DIR)/include
+TPM_SRC_DIR    := $(TPM_ROOT)/tpm
+TPM_INC_DIR    := $(TPM_SRC_DIR)/include
+TPM_CFG_DIR    := $(TPM_ROOT)/TpmConfiguration
 FIRMWARE_ELF   := $(FIRMWARE_BUILD_DIR)/$(FIRMWARE_NAME).elf
 FIRMWARE_BIN   := $(FIRMWARE_BUILD_DIR)/$(FIRMWARE_NAME).bin
 FIRMWARE_MAP   := $(FIRMWARE_ELF).map
 
-# =========================
-# C source files
-# =========================
-TPM_SOURCES     := $(foreach d,$(TPM_SRC_DIR),$(wildcard $(d)/*.c))
-COMPAT_SOURCES  := $(foreach d,$(COMPAT_DIR),$(wildcard $(d)/*.c))
-PLAT_SOURCES    := $(foreach d,$(PLATFORM_DIR),$(wildcard $(d)/*.c))
-SOURCES         := $(PLAT_SOURCES) $(TPM_SOURCES) $(COMPAT_SOURCES)
-
-# ------------------------------------------------------------
-# Targets that REQUIRE the APP_DIR var or LiteX env vars
-# ------------------------------------------------------------
-NEED_APP_DIR_GOALS := all $(FIRMWARE_ELF) $(FIRMWARE_BIN) check-no-openssl
-ifneq (,$(filter $(NEED_APP_DIR_GOALS),$(MAKECMDGOALS)))
-  ifeq ($(wildcard $(APP_DIR)),)
-    $(error APP_DIR '$(APP_DIR)' not found. Override with APP_DIR=... or create it)
-  endif
-endif
-
-REQUIRE_SOC_GOALS := all $(FIRMWARE_ELF) $(FIRMWARE_BIN) wolfssl-build show show-includes show-cflags cc-include-search
+# Goals that require the LiteX SoC environment & toolchain at parse time
+REQUIRE_SOC_GOALS := all tpm-build wolfssl-build show show-includes show-cflags cc-include-search
 SOC_VARS := $(abspath $(SOC_BUILD_DIR))/software/include/generated/variables.mak
 
 ifneq (,$(filter $(REQUIRE_SOC_GOALS),$(MAKECMDGOALS)))
+  # -- Require SoC vars and LiteX common.mak --
   ifeq ($(wildcard $(SOC_VARS)),)
     $(error Missing $(SOC_VARS) (did you build the SoC?). Override SOC_BUILD_DIR or run the SoC build)
   endif
@@ -59,55 +47,46 @@ ifneq (,$(filter $(REQUIRE_SOC_GOALS),$(MAKECMDGOALS)))
     $(error Missing $(SOC_COMM). Check SOC_DIRECTORY or your LiteX tree)
   endif
   include $(SOC_COMM)
+
+  # -- Toolchain sanity: TARGET_PREFIX must exist (e.g. riscv64-unknown-elf-) --
+  ifeq ($(strip $(TARGET_PREFIX)),)
+    $(error TARGET_PREFIX is empty; LiteX did not set the toolchain. Did you build the SoC / set CROSS_COMPILE?)
+  endif
+
+  # Absolute tool paths (avoid host fallbacks; needed by CMake and LTO)
+  CC_PATH     := $(shell command -v $(TARGET_PREFIX)gcc)
+  AR_PATH     := $(shell command -v $(TARGET_PREFIX)gcc-ar)
+  RANLIB_PATH := $(shell command -v $(TARGET_PREFIX)gcc-ranlib)
+  ifeq ($(strip $(CC_PATH)$(AR_PATH)$(RANLIB_PATH)),)
+    $(error Could not find $(TARGET_PREFIX){gcc,gcc-ar,gcc-ranlib} on PATH)
+  endif
+
+  # GCC builtin include dirs (restore <float.h>, <limits.h>, etc. under -nostdinc)
+  GCC_INC     := $(shell $(CC_PATH) -print-file-name=include)
+  GCC_INCFIX  := $(shell $(CC_PATH) -print-file-name=include-fixed)
+  GCC_SYSROOT := $(shell $(CC_PATH) --print-sysroot)
+  BUILTIN_ISYSTEM := -isystem $(GCC_INC) -isystem $(GCC_INCFIX) \
+                     $(if $(GCC_SYSROOT),-isystem $(GCC_SYSROOT)/include)
 else
+  # Optional soft-includes so 'show' targets can still print info without errors
   -include $(SOC_VARS)
   ifneq ($(strip $(SOC_DIRECTORY)),)
     SOC_COMM := $(SOC_DIRECTORY)/software/common.mak
     -include $(SOC_COMM)
   endif
+  # Don’t error out on TARGET_PREFIX here—keep 'clean' etc. working even if SoC isn’t built.
 endif
-
-# --- Early sanity checks for firmware builds ---
-ifneq (,$(filter all $(FIRMWARE_ELF) $(FIRMWARE_BIN),$(MAKECMDGOALS)))
-  ifeq ($(wildcard $(COMPAT_DIR)),)
-    $(warning Note: $(COMPAT_DIR) not found. If you use <openssl/...> forwarders, create it.)
-  endif
-  ifeq ($(wildcard $(CONFIG_DIR)/wolfssl_user_settings.h)),)
-    $(warning Note: $(CONFIG_DIR)/wolfssl_user_settings.h missing. Define your wolfSSL options there.)
-  endif
-
-  ifeq ($(wildcard $(WOLFSSL_INC)/wolfssl/options.h),)
-    $(error Missing wolfSSL headers in $(WOLFSSL_INC). Run 'make wolfssl-build' or set WOLFSSL_INSTALL_DIR)
-  endif
-  ifeq ($(wildcard $(WOLFSSL_LIB_A)),)
-    $(error Missing $(WOLFSSL_LIB_A). Run 'make wolfssl-build')
-  endif
-
-  ifeq ($(strip $(TPM_SOURCES)),)
-    $(error No TPM sources found in $(TPM_SRC_DIR). Did you set the right path?)
-  endif
-endif
-
-# =========================
-# Include paths
-# =========================
-INCLUDES += \
-	-I$(CONFIG_DIR) \
-	-I$(WOLFSSL_INC) \
-	-I$(COMPAT_DIR) \
-	-I$(PLATFORM_DIR) \
-	-I$(TPM_INC)
 
 # =========================
 # C / LD flags
 # =========================
 CFLAGS += \
-	-DWOLFSSL_USER_SETTINGS \
-	-DHASH_LIB=Ossl -DSYM_LIB=Ossl -DBN_MATH_LIB=Ossl \
+	$(BUILTIN_ISYSTEM) \
 	-nostdinc -ffreestanding -fno-builtin \
 	-ffunction-sections -fdata-sections \
-	-Os -g -std=gnu11 -Wall -Wextra -Werror
-CFLAGS += -fno-unwind-tables -fno-asynchronous-unwind-tables
+	-fno-unwind-tables -fno-asynchronous-unwind-tables \
+	-Os -g -std=gnu11 -Wall -Wextra -Werror \
+	-DWOLFSSL_USER_SETTINGS -DNO_OLD_SHA_NAMES -DNO_OLD_WC_NAMES
 
 # Ensure the map file goes under FIRMWARE_BUILD_DIR
 LDFLAGS := $(filter-out -Wl,-Map=%,$(LDFLAGS)) -Wl,--gc-sections -Wl,-Map,$(FIRMWARE_MAP)
@@ -119,86 +98,15 @@ ifeq ($(LTO),1)
 endif
 
 # =========================
-# Object mapping to FIRMWARE_BUILD_DIR
-# =========================
-PLAT_OBJECTS   := $(patsubst $(PLATFORM_DIR)/%.c,$(FIRMWARE_BUILD_DIR)/platform/%.o,$(PLAT_SOURCES))
-COMPAT_OBJECTS := $(patsubst $(COMPAT_DIR)/%.c,$(FIRMWARE_BUILD_DIR)/compat/%.o,$(COMPAT_SOURCES))
-TPM_OBJECTS    := $(patsubst $(TPM_SRC_DIR)/%.c,$(FIRMWARE_BUILD_DIR)/tpm/%.o,$(TPM_SOURCES))
-OBJECTS := $(PLAT_OBJECTS) $(COMPAT_OBJECTS) $(TPM_OBJECTS)
-DEPS    := $(OBJECTS:.o=.d)
-
-# =========================
-# Default target
-# =========================
-.PHONY: all
-all: $(FIRMWARE_BIN)
-
-# Pattern rules to write objects into FIRMWARE_BUILD_DIR
-$(FIRMWARE_BUILD_DIR)/platform/%.o: $(PLATFORM_DIR)/%.c
-	@mkdir -p $(dir $@)
-	$(compile) -MMD -MP -c $< -o $@
-
-$(FIRMWARE_BUILD_DIR)/compat/%.o: $(COMPAT_DIR)/%.c
-	@mkdir -p $(dir $@)
-	$(compile) -MMD -MP -c $< -o $@
-
-$(FIRMWARE_BUILD_DIR)/tpm/%.o: $(TPM_SRC_DIR)/%.c
-	@mkdir -p $(dir $@)
-	$(compile) -MMD -MP -c $< -o $@
-
-# If you have crt0.S (adjust path or delete this rule if not used)
-$(FIRMWARE_BUILD_DIR)/crt0.o: $(APP_DIR)/crt0.S
-	@mkdir -p $(dir $@)
-	$(assemble) -MMD -MP -c $< -o $@
-
-# Link inside FIRMWARE_BUILD_DIR
-$(FIRMWARE_ELF): $(OBJECTS) $(LINKER_SCRIPT) $(WOLFSSL_LIB_A)
-	@mkdir -p $(dir $@)
-	$(CC) $(LDFLAGS) -T $(LINKER_SCRIPT) -N -o $@ \
-	    $(OBJECTS) \
-	    $(LIBS:lib%=-l%) \
-	    $(WOLFSSL_LIB_A)
-
-# Convert to .bin in FIRMWARE_BUILD_DIR
-$(FIRMWARE_BIN): $(FIRMWARE_ELF)
-	$(OBJCOPY) -O binary $< $@
-ifneq ($(OS),Windows_NT)
-	chmod -x $@
-endif
-
-# Include dep files from FIRMWARE_BUILD_DIR
--include $(DEPS)
-
-# =========================
 # wolfSSL build
 # =========================
-.PHONY: wolfssl-build wolfssl-clean
-ifneq (,$(filter wolfssl-build wolfssl-clean show-wolfssl-cflags,$(MAKECMDGOALS)))
-
-ifeq ($(strip $(TARGET_PREFIX)),)
-  $(error TARGET_PREFIX is empty; did you include LiteX's common.mak?)
-endif
-
-# Tool paths (absolute)
-W_CC_PATH     := $(shell command -v $(TARGET_PREFIX)gcc)
-W_AR_PATH     := $(shell command -v $(TARGET_PREFIX)gcc-ar)
-W_RANLIB_PATH := $(shell command -v $(TARGET_PREFIX)gcc-ranlib)
-ifeq ($(strip $(W_CC_PATH)$(W_AR_PATH)$(W_RANLIB_PATH)),)
-  $(error Could not find $(TARGET_PREFIX){gcc,gcc-ar,gcc-ranlib} on PATH)
-endif
-
-# Discover the cross toolchain’s built-in include folders (safe for bare-metal).
-GCC_INC      := $(shell $(W_CC_PATH) -print-file-name=include)
-GCC_INCFIX   := $(shell $(W_CC_PATH) -print-file-name=include-fixed)
-# Some toolchains use a sysroot; adding it (if present) is harmless.
-GCC_SYSROOT  := $(shell $(W_CC_PATH) --print-sysroot)
+.PHONY: wolfssl-build wolfssl-clean wolfssl-ready
 
 # Keep wolfSSL compile flags minimal and freestanding; avoid firmware LDFLAGS
 WOLFSSL_CFG_DIR := $(CONFIG_DIR)
 WOLFSSL_CFLAGS  := $(CFLAGS) -I$(WOLFSSL_CFG_DIR) \
-                   -DWOLFSSL_USER_SETTINGS -DHAVE_SYS_TIME_H -Wno-error=cpp \
-				   -isystem $(GCC_INC) -isystem $(GCC_INCFIX) \
-				   $(if $(GCC_SYSROOT),-isystem $(GCC_SYSROOT)/include)
+                   -DHAVE_SYS_TIME_H -Wno-error=cpp \
+				   -DWOLFSSL_SP=OFF -DWOLFSSL_SP_MATH=OFF
 
 # TODO: revise LDFLAGS, and see if I need base ones
 # WOLFSSL_LDFLAGS := $(LDFLAGS)
@@ -209,14 +117,14 @@ wolfssl-build:
 	@rm -rf "$(WOLFSSL_BUILD_DIR)"
 	@mkdir -p "$(WOLFSSL_BUILD_DIR)" "$(WOLFSSL_INSTALL_DIR)"
 	cd "$(WOLFSSL_BUILD_DIR)" && \
-	  CC="$(W_CC_PATH)" AR="$(W_AR_PATH)" RANLIB="$(W_RANLIB_PATH)" \
+	  CC="$(CC_PATH)" AR="$(AR_PATH)" RANLIB="$(RANLIB_PATH)" \
 	  CFLAGS="$(WOLFSSL_CFLAGS)" LDFLAGS="$(WOLFSSL_LDFLAGS)" \
 	  cmake -S "$(WOLFSSL_SRC_DIR)" -B . \
 	    -DCMAKE_SYSTEM_NAME=Generic \
-	    -DCMAKE_C_COMPILER="$(W_CC_PATH)" \
-	    -DCMAKE_AR="$(W_AR_PATH)" \
-	    -DCMAKE_RANLIB="$(W_RANLIB_PATH)" \
-	    -DCMAKE_ASM_COMPILER="$(W_CC_PATH)" \
+	    -DCMAKE_C_COMPILER="$(CC_PATH)" \
+	    -DCMAKE_AR="$(AR_PATH)" \
+	    -DCMAKE_RANLIB="$(RANLIB_PATH)" \
+	    -DCMAKE_ASM_COMPILER="$(CC_PATH)" \
 	    -DCMAKE_C_FLAGS="$(WOLFSSL_CFLAGS)" \
 	    -DCMAKE_EXE_LINKER_FLAGS="$(WOLFSSL_LDFLAGS)" \
 	    -DCMAKE_TRY_COMPILE_TARGET_TYPE=STATIC_LIBRARY \
@@ -232,12 +140,103 @@ wolfssl-build:
 wolfssl-clean:
 	$(RM) -r "$(WOLFSSL_BUILD_DIR)" "$(WOLFSSL_INSTALL_DIR)"
 
-endif
+$(WOLFSSL_LIB_A):
+	$(MAKE) wolfssl-build
+
+wolfssl-ready: $(WOLFSSL_LIB_A)
+
+# =================== Build TPM+Platform+Compat static library ===================
+# Sources:
+#  - TPM: everything under tpm/
+#  - Platform + Compat: all .c in my dirs
+TPM_ALL := $(shell find $(TPM_SRC_DIR) -name '*.c' | LC_ALL=C sort)
+TPM_EXCLUDE := $(TPM_SRC_DIR)/cryptolibs/Ossl/BnToOsslMath.c $(TPM_SRC_DIR)/cryptolibs/Ossl/TpmToOsslSupport.c
+TPM_SOURCES_LIB := $(filter-out $(TPM_EXCLUDE),$(TPM_ALL))
+PLAT_SOURCES_LIB   := $(shell find $(PLATFORM_DIR) -name '*.c' | LC_ALL=C sort)
+
+# Object folder under TPM_BUILD_DIR, mirroring source trees
+TPM_OBJ_DIR := $(TPM_BUILD_DIR)/obj
+TPM_OBJS    := $(patsubst $(TPM_SRC_DIR)/%.c,$(TPM_OBJ_DIR)/tpm/%.o,$(TPM_SOURCES_LIB))
+PLAT_OBJS   := $(patsubst $(PLATFORM_DIR)/%.c,$(TPM_OBJ_DIR)/platform/%.o,$(PLAT_SOURCES_LIB))
+TPM_CORE_OBJS := $(TPM_OBJS) $(PLAT_OBJS)
+TPM_LIB       := $(TPM_BUILD_DIR)/libtpm.a
+
+# TPM_DEFS := -DHASH_LIB=Wolf -DSYM_LIB=Wolf -DMATH_LIB=TpmBigNum -DBN_MATH_LIB=Wolf
+TPM_DEFS := -DHASH_LIB=Ossl -DSYM_LIB=Ossl -DBN_MATH_LIB=Ossl -DMATH_LIB=TpmBigNum
+
+# Includes needed by TPM core (mirrors upstream) + your platform/compat
+TPM_INCLUDES := \
+  -I$(CONFIG_DIR) \
+  -I$(OSSL_INC) \
+  -I$(WOLFSSL_INC) \
+  -I$(COMPAT_DIR) \
+  -I$(TPM_CFG_DIR) \
+  -I$(TPM_INC_DIR) \
+  -I$(TPM_INC_DIR)/public \
+  -I$(TPM_INC_DIR)/private \
+  -I$(TPM_INC_DIR)/private/prototypes \
+  -I$(TPM_INC_DIR)/platform_interface \
+  -I$(TPM_INC_DIR)/platform_interface/prototypes \
+  -I$(TPM_SRC_DIR)/cryptolibs \
+  -I$(TPM_SRC_DIR)/cryptolibs/common/include \
+  -I$(TPM_SRC_DIR)/cryptolibs/TpmBigNum/include \
+  -I$(TPM_SRC_DIR)/cryptolibs/Ossl/include \
+  -I$(PLATFORM_DIR) \
+  -I$(PLATFORM_DIR)/include
+
+# Compile flags specifically for the TPM library build:
+TPM_CFLAGS := $(CFLAGS) $(TPM_DEFS) $(TPM_INCLUDES) \
+              -DWOLFSSL_USER_SETTINGS \
+              -include "$(OSSL_INC)/options.h" \
+              -include "$(OSSL_INC)/wolfcrypt/settings.h" \
+              -include "$(OSSL_INC)/ssl.h" \
+              -include "$(COMPAT_DIR)/wolfssl.h" \
+              -Wno-error=cpp -Wno-error=unused-value -Wno-error=unused-parameter \
+              -Wno-error=expansion-to-defined -Wno-error=missing-prototypes \
+			  -Wno-error=implicit-fallthrough -Wno-error=deprecated-declarations \
+			  -Wno-strict-prototypes
+# TODO: -Wno-error=expansion-to-defined might break something
+# We do this specifically to these files only
+$(TPM_OBJ_DIR)/tpm/src/main/CommandDispatcher.o: TPM_CFLAGS += -Wno-cast-function-type
+$(TPM_OBJ_DIR)/platform/src/tpm_to_platform_interface.o: TPM_CFLAGS += -Wno-error=old-style-definition
+
+
+# Pattern rules (scoped CFLAGS so -I's don't leak anywhere else)
+$(TPM_OBJ_DIR)/tpm/%.o: $(TPM_SRC_DIR)/%.c | wolfssl-ready
+	@mkdir -p $(dir $@)
+	$(CC) -MMD -MP -c $(TPM_CFLAGS) $< -o $@
+
+$(TPM_OBJ_DIR)/platform/%.o: $(PLATFORM_DIR)/%.c | wolfssl-ready
+	@mkdir -p $(dir $@)
+	$(CC) -MMD -MP -c $(TPM_CFLAGS) $< -o $@
+
+# Archive
+$(TPM_LIB): $(TPM_CORE_OBJS)
+	@mkdir -p $(dir $@)
+	$(AR) rcs $@ $^
+
+.PHONY: tpm-build tpm-clean list-tpm-sources
+tpm-build: $(TPM_LIB)
+	@echo "Built $(TPM_LIB)"
+
+tpm-clean:
+	$(RM) -r $(TPM_BUILD_DIR)
+
+list-tpm-sources:
+	@echo "TPM:    $$(echo $(TPM_SOURCES_LIB)    | wc -w) files"
+	@echo "PLAT:   $$(echo $(PLAT_SOURCES_LIB)   | wc -w) files"
+	@printf "%s\n" $(TPM_SOURCES_LIB)
+	@printf "%s\n" $(PLAT_SOURCES_LIB)
+
+# Include depfiles for the lib build (safe if none yet)
+-include $(TPM_CORE_OBJS:.o=.d)
+
 
 # =========================
 # Utilities
 # =========================
-.PHONY: clean show help check-no-openssl show-includes cc-include-search show-cflags
+.PHONY: clean show help check-no-openssl show-includes \
+        cc-include-search show-cflags show-wolfssl-cflags show-tpm-cflags
 
 clean:
 	$(RM) -r $(FIRMWARE_BUILD_DIR) \
@@ -285,3 +284,6 @@ show-cflags:
 show-wolfssl-cflags:
 	@echo "WOLFSSL_CFLAGS (split lines):"
 	@printf "%s\n" $(WOLFSSL_CFLAGS)
+
+show-tpm-cflags:
+	@echo "TPM_CFLAGS (split lines):"; printf "%s\n" $(TPM_CFLAGS)

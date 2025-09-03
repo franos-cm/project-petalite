@@ -42,6 +42,7 @@ extern "C"
 /* ============================================================
  * Common (both profiles): OpenSSL compatibility, no TLS
  * ============================================================ */
+// !defined(OPENSSL_COEXIST) && (defined(OPENSSL_EXTRA)
 #define OPENSSL_EXTRA
 #define OPENSSL_NO_SSL
 #define WOLFSSL_CRYPT_ONLY
@@ -52,10 +53,22 @@ extern "C"
 /* ============================================================
  * Math backend (good for rv64 without asm)
  * ============================================================ */
-#define WOLFSSL_SP_MATH_ALL /* use SP math for all sizes */
-#define WOLFSSL_SP_SMALL    /* smaller code footprint */
-/* If 64-bit divide is slow/absent on your core, consider:   */
-/* #define WOLFSSL_SP_DIV_32 */
+#ifndef USE_FAST_MATH
+#define USE_FAST_MATH 1
+#endif
+
+/* Force TFM, disable SP math */
+#undef WOLFSSL_SP
+#undef WOLFSSL_SP_MATH
+
+/* If you do very large RSA, consider setting FP_MAX_BITS, otherwise default is fine */
+// Needed for some tpm features
+#define WOLFSSL_KEY_GEN
+
+/* Harden against side-channel attacks */
+#define WC_RSA_BLINDING      /* Protects RSA private keys from timing attacks */
+#define TFM_TIMING_RESISTANT /* For the Fast Math library */
+#define ECC_TIMING_RESISTANT /* For the Elliptic Curve library */
 
 /* ============================================================
  * Profile A: OPENSSL_FULL_CRYPTO

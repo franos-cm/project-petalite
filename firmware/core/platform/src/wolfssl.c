@@ -1,5 +1,6 @@
 #include <stdint.h>
 #include <stddef.h>
+
 // #include "TpmToPlatformInterface.h"   /* header you pasted, for _plat__GetEntropy */
 
 /* Fill exactly sz bytes or fail. Return 0 on success, non-zero on error. */

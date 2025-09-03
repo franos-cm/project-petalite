@@ -88,7 +88,7 @@ litex_cli --csr-csv="./builds/soc/csr.csv" --regs
 gtkwave ./builds/soc/gateware/sim.fst
 
 
-./firmware/main.py show 
+./firmware/firmware.py show 
 
 #Note:
 We need to implement the shims in tpm_to_platform_interface.h AND ONLY THOSE (as far as I can tell)

@@ -97,6 +97,16 @@ def main():
     add_common(sp_show_inc)
     sp_cc_inc = sub.add_parser("cc-include-search", help="Run 'make cc-include-search'")
     add_common(sp_cc_inc)
+    sp_tpm = sub.add_parser("tpm-build", help="Build TPM+platform+compat static lib")
+    add_common(sp_tpm)
+    sp_tpm_clean = sub.add_parser("tpm-clean", help="Clean TPM static lib build")
+    add_common(sp_tpm_clean)
+    sp_tpm_flags = sub.add_parser("show-tpm-cflags", help="Clean TPM static lib build")
+    add_common(sp_tpm_flags)
+    sp_list = sub.add_parser(
+        "list-tpm-sources", help="List TPM/platform/compat sources"
+    )
+    add_common(sp_list)
 
     # NEW: show-cflags
     sp_show_cflags = sub.add_parser("show-cflags", help="Run 'make show-cflags'")
@@ -119,29 +129,41 @@ def main():
     if args.cmd == "wolfssl-build":
         run(["make", "wolfssl-build"], cwd=fw_dir, env=env)
         return
-    if args.cmd == "wolfssl-clean":
+    elif args.cmd == "wolfssl-clean":
         run(["make", "wolfssl-clean"], cwd=fw_dir, env=env)
         return
-    if args.cmd == "clean":
+    elif args.cmd == "clean":
         run(["make", "clean"], cwd=fw_dir, env=env)
         return
-    if args.cmd == "show":
+    elif args.cmd == "show":
         run(["make", "show"], cwd=fw_dir, env=env)
         return
-    if args.cmd == "show-includes":
+    elif args.cmd == "show-includes":
         run(["make", "show-includes"], cwd=fw_dir, env=env)
         return
-    if args.cmd == "cc-include-search":
+    elif args.cmd == "cc-include-search":
         run(["make", "cc-include-search"], cwd=fw_dir, env=env)
         return
-    if args.cmd == "show-cflags":
+    elif args.cmd == "show-cflags":
         run(["make", "show-cflags"], cwd=fw_dir, env=env)
         return
-    if args.cmd == "show-wolfssl-cflags":
+    elif args.cmd == "show-wolfssl-cflags":
         run(["make", "show-wolfssl-cflags"], cwd=fw_dir, env=env)
         return
+    elif args.cmd == "tpm-build":
+        run(["make", "tpm-build"], cwd=fw_dir, env=env)
+        return
+    elif args.cmd == "tpm-clean":
+        run(["make", "tpm-clean"], cwd=fw_dir, env=env)
+        return
+    elif args.cmd == "show-tpm-cflags":
+        run(["make", "show-tpm-cflags"], cwd=fw_dir, env=env)
+        return
+    elif args.cmd == "list-tpm-sources":
+        run(["make", "list-tpm-sources"], cwd=fw_dir, env=env)
+        return
 
-    if args.cmd == "build":
+    elif args.cmd == "build":
         ld = fw_dir / "linker.ld"
         with maybe_patch_linker(ld, args.mem):
             run(["make"], cwd=fw_dir, env=env)

@@ -1,11 +1,11 @@
-#ifndef RECEIVER_H
-#define RECEIVER_H
+#ifndef TRANSPORT_H
+#define TRANSPORT_H
 
 #include <stdint.h>
 #include <stdbool.h>
 #include <string.h>
+#include <irq.h>
 #include <generated/csr.h>
-#include <libbase/irq.h>
 #include <libbase/uart.h>
 #include "shared.h"
 
@@ -37,9 +37,9 @@ typedef enum
 
 } rx_return_code_t;
 
-void uart_irq_init(void);
-uint32_t inline get_cmd_len(void);
-bool receiver_ingestion_done(void);
-uint32_t read_command();
+void transport_irq_init(void);
+inline uint32_t transport_get_cmd_len(void);
+bool transport_ingestion_done(void);
+uint32_t transport_read_command(void);
 
-#endif // RECEIVER_H
+#endif // TRANSPORT_H

@@ -1,18 +1,18 @@
 
-#include "receiver.h"
+#include "transport.h"
 #include "run_command.h"
 
 int main(void)
 {
-    uart_irq_init();
+    transport_irq_init();
     for (;;)
     {
-        if (receiver_ingestion_done())
+        if (transport_ingestion_done())
         {
-            uint32_t cmd_read_error = read_command();
+            uint32_t cmd_read_error = transport_read_command();
             if (!cmd_read_error)
             {
-                uint32_t cmd_len = get_command_len();
+                uint32_t cmd_len = transport_get_cmd_len();
                 uint32_t resp_len = (uint32_t)sizeof(tpm_cmd_buf);
                 uint8_t *resp_ptr = tpm_cmd_buf;
 

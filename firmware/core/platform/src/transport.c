@@ -1,10 +1,10 @@
-#include "receiver.h"
+#include "transport.h"
 
 // Global vars for the interrupt service
-static volatile rx_state_t rx_state = RX_WAITING_FOR_HEADER;
-static volatile rx_return_code_t rx_code = SUCCESSFUL;
-static volatile uint32_t bytes_collected = 0;
-static volatile uint32_t expected_cmd_len = 0;
+static rx_state_t rx_state = RX_WAITING_FOR_HEADER;
+static rx_return_code_t rx_code = SUCCESSFUL;
+static uint32_t bytes_collected = 0;
+uint32_t expected_cmd_len = 0;
 
 // ---- Helpers ----
 static inline uint32_t be32_read(const uint8_t *p)
@@ -32,12 +32,12 @@ static void receiver_reset(void)
 }
 
 // ---- Interrupt Service Routine ----
-static void uart_rx_isr(void)
+static void rx_isr(void)
 {
     // Drain all available bytes quickly
-    while (uart_read_nonblock())
+    while (!uart_rxempty_read())
     {
-        uint8_t b = uart_read();
+        uint8_t b = uart_rxtx_read();
 
         // If a previous error or ready state hasn't been consumed, drop bytes (or mask RX)
         if (rx_state == RX_COMMAND_READY || rx_state == RX_ERROR)
@@ -64,13 +64,13 @@ static void uart_rx_isr(void)
     }
 }
 
-static void uart_isr(void)
+static void transport_isr(void)
 {
     uint32_t pending = uart_ev_pending_read();
 
     if (pending & UART_EV_RX)
     {
-        uart_rx_isr();
+        rx_isr();
         uart_ev_pending_write(UART_EV_RX);
     }
 
@@ -82,31 +82,31 @@ static void uart_isr(void)
 
 // ---- Public API for main loop ----
 // Call once at startup
-void uart_irq_init(void)
+void transport_irq_init(void)
 {
     receiver_reset();
 
     // Clear stale events and enable RX interrupts
-    uart_ev_pending_write(UART_EV_RX | UART_EV_TX);
-    uart_ev_enable_write(UART_EV_RX); // enable RX only
+    uart_ev_pending_write(uart_ev_pending_read());
+    uart_ev_enable_write(UART_EV_RX); // enable RX only, for now
 
     // Hook ISR and unmask at CPU/PLIC level
-    irq_set_handler(UART_INTERRUPT, uart_isr);
+    irq_attach(UART_INTERRUPT, transport_isr);
     irq_setmask(irq_getmask() | (1u << UART_INTERRUPT));
-    irq_enable();
+    irq_setie(1);
 }
 
-uint32_t inline get_cmd_len(void)
+inline uint32_t transport_get_cmd_len(void)
 {
     return expected_cmd_len;
 }
 
-bool inline receiver_ingestion_done(void)
+inline bool transport_ingestion_done(void)
 {
     return (rx_state == RX_COMMAND_READY) || (rx_state == RX_ERROR);
 }
 
-uint32_t read_command()
+uint32_t transport_read_command(void)
 {
     if (rx_state == RX_COMMAND_READY)
         receiver_reset();

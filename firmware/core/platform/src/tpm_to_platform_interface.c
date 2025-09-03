@@ -6,8 +6,7 @@
 #include <stddef.h>
 #include <string.h>
 
-#include <TpmConfiguration/TpmBuildSwitches.h>
-#include <TpmConfiguration/TpmProfile.h>
+#include <public/tpm_public.h>
 #include <tpm_to_platform_interface.h>
 
 // Fallbacks if not defined by headers

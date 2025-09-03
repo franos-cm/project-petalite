@@ -1,10 +1,13 @@
 // Note: this is mostly a copy of a file that already exists in the original project
-
 #include <assert.h>
 #include <setjmp.h>
 #include <stdio.h>
-#include "TpmBuildSwitches.h"
+
 #include <public/tpm_public.h>
+#include <platform_interface/tpm_to_platform_interface.h>
+#include <platform_interface/platform_to_tpm_interface.h>
+#include <platform_interface/pcrstruct.h>
+#include <platform_interface/prototypes/platform_pcr_fp.h>
 
 // The following extern globals are copied here from Global.h to avoid including all of Tpm.h here.
 // TODO: Improve the interface by which these values are shared.
