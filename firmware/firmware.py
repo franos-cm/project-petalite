@@ -81,7 +81,7 @@ def main():
     # existing
     sp_build = sub.add_parser("build", help="Build firmware (.bin); copy artifacts")
     add_common(sp_build)
-    sp_build.add_argument("--mem", default="main_ram")
+    sp_build.add_argument("--mem", default="rom")
     sp_build.add_argument("--output-dir", default="build-firmware")
     sp_build.add_argument("--fbi", action="store_true")
 
@@ -101,7 +101,7 @@ def main():
     add_common(sp_tpm)
     sp_tpm_clean = sub.add_parser("tpm-clean", help="Clean TPM static lib build")
     add_common(sp_tpm_clean)
-    sp_tpm_flags = sub.add_parser("show-tpm-cflags", help="Clean TPM static lib build")
+    sp_tpm_flags = sub.add_parser("show-tpm-flags", help="Clean TPM static lib build")
     add_common(sp_tpm_flags)
     sp_list = sub.add_parser(
         "list-tpm-sources", help="List TPM/platform/compat sources"
@@ -109,10 +109,10 @@ def main():
     add_common(sp_list)
 
     # NEW: show-cflags
-    sp_show_cflags = sub.add_parser("show-cflags", help="Run 'make show-cflags'")
+    sp_show_cflags = sub.add_parser("show-flags", help="Run 'make show-cflags'")
     add_common(sp_show_cflags)
     sp_show_wolfssl_cflags = sub.add_parser(
-        "show-wolfssl-cflags", help="Run 'make show-cflags'"
+        "show-wolfssl-flags", help="Run 'make show-cflags'"
     )
     add_common(sp_show_wolfssl_cflags)
 
@@ -144,11 +144,11 @@ def main():
     elif args.cmd == "cc-include-search":
         run(["make", "cc-include-search"], cwd=fw_dir, env=env)
         return
-    elif args.cmd == "show-cflags":
-        run(["make", "show-cflags"], cwd=fw_dir, env=env)
+    elif args.cmd == "show-flags":
+        run(["make", "show-flags"], cwd=fw_dir, env=env)
         return
-    elif args.cmd == "show-wolfssl-cflags":
-        run(["make", "show-wolfssl-cflags"], cwd=fw_dir, env=env)
+    elif args.cmd == "show-wolfssl-flags":
+        run(["make", "show-wolfssl-flags"], cwd=fw_dir, env=env)
         return
     elif args.cmd == "tpm-build":
         run(["make", "tpm-build"], cwd=fw_dir, env=env)
@@ -156,8 +156,8 @@ def main():
     elif args.cmd == "tpm-clean":
         run(["make", "tpm-clean"], cwd=fw_dir, env=env)
         return
-    elif args.cmd == "show-tpm-cflags":
-        run(["make", "show-tpm-cflags"], cwd=fw_dir, env=env)
+    elif args.cmd == "show-tpm-flags":
+        run(["make", "show-tpm-flags"], cwd=fw_dir, env=env)
         return
     elif args.cmd == "list-tpm-sources":
         run(["make", "list-tpm-sources"], cwd=fw_dir, env=env)

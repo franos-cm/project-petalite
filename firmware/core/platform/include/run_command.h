@@ -23,8 +23,6 @@ extern UINT32 s_failFunction;
 extern UINT32 s_failLine;
 extern UINT32 s_failCode;
 
-jmp_buf s_jumpBuffer;
-
 LIB_EXPORT void _plat__RunCommand(
     uint32_t requestSize,    // IN: command buffer size
     unsigned char *request,  // IN: command buffer

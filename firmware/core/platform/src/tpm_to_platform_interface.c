@@ -316,13 +316,7 @@ LIB_EXPORT int _plat__PhysicalPresenceAsserted(void)
     return 0;
 }
 
-LIB_EXPORT NORETURN void _plat__Fail(void)
-{
-    // Fatal platform-dependent abort. Trap forever.
-    for (;;)
-    { /* spin */
-    }
-}
+extern NORETURN void _plat__Fail(void);
 
 // ---------- Unique / manufacturing data / vendor caps ----------
 

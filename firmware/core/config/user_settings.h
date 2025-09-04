@@ -44,6 +44,7 @@ extern "C"
  * ============================================================ */
 // !defined(OPENSSL_COEXIST) && (defined(OPENSSL_EXTRA)
 #define OPENSSL_EXTRA
+#define OPENSSL_ALL
 #define OPENSSL_NO_SSL
 #define WOLFSSL_CRYPT_ONLY
 #define WOLFCRYPT_ONLY
@@ -80,12 +81,9 @@ extern "C"
 /* --- Public-key --- */
 #undef NO_RSA
 #undef NO_DH
-#define HAVE_ECC
 /* Curves: enable the common set so EC/BN are “complete” */
 #define ECC_USER_CURVES
-#undef NO_ECC256
-#define HAVE_ECC384
-#define HAVE_ECC521
+#define HAVE_ECC
 /* If you need 192/224 as well, add HAVE_ECC192/HAVE_ECC224 */
 
 /* --- Symmetric / AEAD --- */

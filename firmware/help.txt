@@ -1,0 +1,10 @@
+What to do:
+
+
+Two alternatives:
+- Either we change the compat layer between wolfssl and ossl, by adding some shims
+- Or we compile tpm with wolfssl libs, and hope it works
+    - For that, Go back to tpm main, undo modifications done for Ossl
+        - or we might as well already copy the new tpm repo into here
+    - Some errors will appear, and we work them out in a case by case basis
+- Lets spend at most one more week doing this

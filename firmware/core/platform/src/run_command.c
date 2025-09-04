@@ -16,6 +16,7 @@
 
 //** Includes and locals
 #include "run_command.h"
+jmp_buf s_jumpBuffer;
 
 //** Functions
 //***_plat__RunCommand()

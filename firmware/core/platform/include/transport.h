@@ -38,7 +38,7 @@ typedef enum
 } rx_return_code_t;
 
 void transport_irq_init(void);
-inline uint32_t transport_get_cmd_len(void);
+uint32_t transport_get_cmd_len(void);
 bool transport_ingestion_done(void);
 uint32_t transport_read_command(void);
 
