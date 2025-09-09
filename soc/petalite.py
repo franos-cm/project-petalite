@@ -64,8 +64,7 @@ class PetaliteCore(SoCCore):
             # Communication
             with_uart=False,
             # Memory specs, considering full TPM firmware
-            # TODO: make it like 200 kB
-            integrated_rom_size=250 * ByteValues.MBYTE,
+            integrated_rom_size=200 * ByteValues.KBYTE,
             integrated_sram_size=70 * ByteValues.KBYTE,
             integrated_rom_init=integrated_rom_init,
             # integrated_main_ram_size=0x1_0000,  # TODO: cant use main_ram because of SBI...
