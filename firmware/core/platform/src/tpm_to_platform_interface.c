@@ -1,13 +1,6 @@
-// platform_shims.c
 // Minimal platform shim for MS TPM 2.0 reference core on bare-metal.
 // Safe to compile/link; replace TODO sections with your hardware hooks.
-
-#include <stdint.h>
-#include <stddef.h>
-#include <string.h>
-
-#include <public/tpm_public.h>
-#include <tpm_to_platform_interface.h>
+#include "platform.h"
 
 // Fallbacks if not defined by headers
 #ifndef LIB_EXPORT

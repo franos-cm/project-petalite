@@ -27,6 +27,7 @@ WOLFSSL_LIB_A  := $(WOLFSSL_INSTALL_DIR)/lib/libwolfssl.a
 TPM_SRC_DIR    := $(TPM_ROOT)/tpm
 TPM_INC_DIR    := $(TPM_SRC_DIR)/include
 TPM_CFG_DIR    := $(TPM_ROOT)/TpmConfiguration
+SOC_SW_LIB_DIR := $(SOC_BUILD_DIR)/software
 FIRMWARE_ELF   := $(FIRMWARE_BUILD_DIR)/$(FIRMWARE_NAME).elf
 FIRMWARE_BIN   := $(FIRMWARE_BUILD_DIR)/$(FIRMWARE_NAME).bin
 FIRMWARE_MAP   := $(FIRMWARE_ELF).map
@@ -104,8 +105,8 @@ endif
 LDFLAGS += -Wl,-Map=$(FIRMWARE_MAP)
 
 # Override LTO
-# CFLAGS  += -flto
-# LDFLAGS += -flto
+CFLAGS  += -flto
+LDFLAGS += -flto
 
 
 # =========================
@@ -114,10 +115,8 @@ LDFLAGS += -Wl,-Map=$(FIRMWARE_MAP)
 .PHONY: wolfssl-build wolfssl-clean wolfssl-ready
 
 # Keep wolfSSL compile flags minimal and freestanding; avoid firmware LDFLAGS
-WOLFSSL_CFG_DIR := $(CONFIG_DIR)
-WOLFSSL_CFLAGS  := $(CFLAGS) -I$(WOLFSSL_CFG_DIR) \
-                   -DHAVE_SYS_TIME_H -Wno-error=cpp \
-				   -DWOLFSSL_SP=OFF -DWOLFSSL_SP_MATH=OFF
+WOLFSSL_CFLAGS  := $(CFLAGS) -I$(CONFIG_DIR) \
+                   -DHAVE_SYS_TIME_H -Wno-error=cpp
 
 wolfssl-build:
 	@rm -rf "$(WOLFSSL_BUILD_DIR)"
@@ -156,8 +155,7 @@ wolfssl-ready: $(WOLFSSL_LIB_A)
 #  - TPM: everything under tpm/
 #  - Platform + Compat: all .c in my dirs
 TPM_ALL := $(shell find $(TPM_SRC_DIR) -name '*.c' | LC_ALL=C sort)
-# TPM_EXCLUDE := $(TPM_SRC_DIR)/cryptolibs/Ossl/BnToOsslMath.c $(TPM_SRC_DIR)/cryptolibs/Ossl/TpmToOsslSupport.c
-TPM_EXCLUDE := 
+TPM_EXCLUDE := $(TPM_SRC_DIR)/cryptolibs/Ossl/BnToOsslMath.c $(TPM_SRC_DIR)/cryptolibs/Ossl/TpmToOsslSupport.c
 TPM_SOURCES_LIB := $(filter-out $(TPM_EXCLUDE),$(TPM_ALL))
 PLAT_SOURCES_LIB   := $(shell find $(PLATFORM_DIR) -name '*.c' | LC_ALL=C sort)
 
@@ -168,8 +166,8 @@ PLAT_OBJS   := $(patsubst $(PLATFORM_DIR)/%.c,$(TPM_OBJ_DIR)/platform/%.o,$(PLAT
 TPM_CORE_OBJS := $(TPM_OBJS) $(PLAT_OBJS)
 TPM_LIB       := $(TPM_BUILD_DIR)/libtpm.a
 
-# TPM_DEFS := -DHASH_LIB=Wolf -DSYM_LIB=Wolf -DMATH_LIB=TpmBigNum -DBN_MATH_LIB=Wolf
-TPM_DEFS := -DHASH_LIB=Ossl -DSYM_LIB=Ossl -DBN_MATH_LIB=Ossl -DMATH_LIB=TpmBigNum
+SOC_SW_LIB_ARCHIVES := $(foreach L,$(LIBS),$(wildcard $(SOC_SW_LIB_DIR)/$(L)/$(L).a))
+TPM_DEFS := -DHASH_LIB=Wolf -DSYM_LIB=Wolf -DBN_MATH_LIB=Wolf -DMATH_LIB=TpmBigNum
 
 # Includes needed by TPM core (mirrors upstream) + your platform/compat
 TPM_INCLUDES := \
@@ -187,7 +185,7 @@ TPM_INCLUDES := \
   -I$(TPM_SRC_DIR)/cryptolibs \
   -I$(TPM_SRC_DIR)/cryptolibs/common/include \
   -I$(TPM_SRC_DIR)/cryptolibs/TpmBigNum/include \
-  -I$(TPM_SRC_DIR)/cryptolibs/Ossl/include \
+  -I$(TPM_SRC_DIR)/cryptolibs/wolf/include \
   -I$(PLATFORM_DIR) \
   -I$(PLATFORM_DIR)/include
 
@@ -206,6 +204,7 @@ TPM_CFLAGS := $(CFLAGS) $(TPM_DEFS) $(TPM_INCLUDES) \
 # We do this specifically to these files only
 $(TPM_OBJ_DIR)/tpm/src/main/CommandDispatcher.o: TPM_CFLAGS += -Wno-cast-function-type
 $(TPM_OBJ_DIR)/platform/src/tpm_to_platform_interface.o: TPM_CFLAGS += -Wno-error=old-style-definition
+$(TPM_OBJ_DIR)/platform/src/platform_pcr.o: TPM_CFLAGS += -Wno-error=old-style-definition
 
 
 # Pattern rules (scoped CFLAGS so -I's don't leak anywhere else)
@@ -252,6 +251,7 @@ FIRMWARE_CFLAGS := $(CFLAGS) $(TPM_INCLUDES) \
                    -include "$(OSSL_INC)/options.h" \
                    -include "$(OSSL_INC)/wolfcrypt/settings.h" \
                    -include "$(OSSL_INC)/ssl.h" \
+				   -Wno-error=cpp \
 				   -Wno-strict-prototypes
 
 $(FIRMWARE_BUILD_DIR)/%.o: $(APP_DIR)/%.c | wolfssl-ready
@@ -268,22 +268,22 @@ $(STARTUP_OBJ): $(STARTUP_SRC) | wolfssl-ready
 # Link final ELF
 $(FIRMWARE_ELF): $(STARTUP_OBJ) $(FIRMWARE_OBJS) $(TPM_LIB) $(WOLFSSL_LIB_A) $(LINKER_SCRIPT)
 	@mkdir -p $(dir $@)
-	$(CC) -T $(LINKER_SCRIPT) $(LDFLAGS) $(STARTUP_OBJ) $(FIRMWARE_OBJS) $(TPM_LIB) $(WOLFSSL_LIB_A) -o $@
+	@if [ -z "$(SOC_SW_LIB_ARCHIVES)" ]; then \
+	  echo "ERROR: No SoC libraries found under $(SOC_SW_LIB_DIR)"; exit 1; \
+	fi
+	$(CC) -T $(LINKER_SCRIPT) $(LDFLAGS) \
+	  $(STARTUP_OBJ) $(FIRMWARE_OBJS) \
+	  -Wl,--start-group $(TPM_LIB) $(WOLFSSL_LIB_A) $(SOC_SW_LIB_ARCHIVES) -lgcc -Wl,--end-group \
+	  -o $@
 
 # Produce raw binary
 $(FIRMWARE_BIN): $(FIRMWARE_ELF)
 	$(OBJCOPY_PATH) -O binary $< $@
 
-# Copy convenience top-level binary (what firmware.py expects)
-FIRMWARE_TOP_BIN := $(FIRMWARE_NAME).bin
-
-$(FIRMWARE_TOP_BIN): $(FIRMWARE_BIN)
-	cp $< $@
-
 # Default target
 .PHONY: all
-all: $(FIRMWARE_TOP_BIN)
-	@echo "Built $@ -> $(FIRMWARE_BIN)"
+all: $(FIRMWARE_BIN)
+	@echo "Built $@"
 
 # Track deps of firmware objects too
 -include $(FIRMWARE_OBJS:.o=.d) $(STARTUP_OBJ:.o=.d)
@@ -291,7 +291,7 @@ all: $(FIRMWARE_TOP_BIN)
 # =========================
 # Utilities
 # =========================
-.PHONY: clean show help check-no-openssl show-includes \
+.PHONY: clean show help check-no-openssl show-includes show-soc-libs \
         cc-include-search show-cflags show-wolfssl-cflags show-tpm-cflags
 
 clean:
@@ -347,3 +347,11 @@ show-wolfssl-flags:
 show-tpm-flags:
 	@echo "TPM_CFLAGS (split lines):"
 	printf "%s\n" $(TPM_CFLAGS)
+
+show-soc-libs:
+	@echo "SOC_SW_LIB_DIR = $(SOC_SW_LIB_DIR)"
+	@echo "LIBS = $(LIBS)"
+	@echo "Resolved archives:"
+	@for a in $(SOC_SW_LIB_ARCHIVES); do echo "  $$a"; done
+	@echo "Check memcmp symbol (first matching archive):"
+	@nm $(firstword $(filter %/libc.a,$(SOC_SW_LIB_ARCHIVES))) 2>/dev/null | grep -w memcmp || echo "memcmp not found"

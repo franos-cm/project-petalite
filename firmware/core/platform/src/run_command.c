@@ -46,12 +46,7 @@ LIB_EXPORT NORETURN void _plat__Fail(void)
     // The simulator asserts during unexpected (i.e., un-forced) failure modes.
     if (!g_forceFailureMode)
     {
-        fprintf(stderr, "Unexpected failure mode (code %d) in ", s_failCode);
-#if FAIL_TRACE
-        fprintf(stderr, "function '%s' (line %d)\n", s_failFunctionName, s_failLine);
-#else  // FAIL_TRACE
-        fprintf(stderr, "location code 0x%0x\n", s_locationCode);
-#endif // FAIL_TRACE
+        // This calls, ultimately, pid and kill... but we can keep it for now
         assert(FALSE);
     }
 

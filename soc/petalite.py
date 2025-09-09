@@ -23,6 +23,14 @@ from dilithium import Dilithium
 from platforms import PetaliteSimPlatform
 from helpers import arg_parser, generate_gtkw_savefile, CommProtocol
 
+from enum import IntEnum
+
+
+class ByteValues(IntEnum):
+    BYTE = 1
+    KBYTE = 1024
+    MBYTE = 1024**2
+
 
 class PetaliteCore(SoCCore):
     is_simulated: bool
@@ -55,9 +63,10 @@ class PetaliteCore(SoCCore):
             clk_freq=sys_clk_freq,
             # Communication
             with_uart=False,
-            # Memory specs
-            integrated_rom_size=0x20000,
-            integrated_sram_size=0x2000,
+            # Memory specs, considering full TPM firmware
+            # TODO: make it like 200 kB
+            integrated_rom_size=250 * ByteValues.MBYTE,
+            integrated_sram_size=70 * ByteValues.KBYTE,
             integrated_rom_init=integrated_rom_init,
             # integrated_main_ram_size=0x1_0000,  # TODO: cant use main_ram because of SBI...
         )

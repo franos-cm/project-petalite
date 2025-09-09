@@ -19,46 +19,55 @@ extern "C"
 #define PROFILE_TINY_CRYPTO /* minimal later */
 #endif
 
-/* ============================================================
- * Platform / toolchain (safe for bare-metal rv64)
- * ============================================================ */
+// Baremetal environment
 #define SINGLE_THREADED
 #define NO_FILESYSTEM
 #define WOLFSSL_NO_STDIO
 #define WOLFSSL_NO_SOCK
 #define NO_WRITEV
-#define NO_DEV_RANDOM /* no /dev/random on bare-metal */
+#define NO_DEV_RANDOM
 #define NO_MAIN_DRIVER
+#define WOLFSSL_NO_CURRDIR
+#define NO_WOLFSSL_DIR
+#define TARGET_EMBEDDED
+#define NO_ERROR_STRINGS
+#undef DEBUG_WOLFSSL
 
-#define TARGET_EMBEDDED /* match wolf template style */
-#define WOLFSSL_SMALL_STACK
+// 64-bit CPU
 #define SIZEOF_LONG_LONG 8
 #define WOLFSSL_GENERAL_ALIGNMENT 8 /* rv64: align to 8 for safety */
 
-/* Keep timeval available to callbacks.h */
+// Mem definitions for baremetal
+#define WOLFSSL_SMALL_STACK
+#define WOLFSSL_SMALL_STACK_CACHE
+
+// Necessary headers
 #include <time.h>
 #include <sys/time.h>
 
 /* ============================================================
  * Common (both profiles): OpenSSL compatibility, no TLS
  * ============================================================ */
-// !defined(OPENSSL_COEXIST) && (defined(OPENSSL_EXTRA)
 #define OPENSSL_EXTRA
-#define OPENSSL_ALL
 #define OPENSSL_NO_SSL
 #define WOLFSSL_CRYPT_ONLY
 #define WOLFCRYPT_ONLY
 #define NO_WOLFSSL_CLIENT
 #define NO_WOLFSSL_SERVER
 
+// ECC
+#define HAVE_ECC
+#define ECC_TIMING_RESISTANT
+#define WOLFSSL_PUBLIC_ECC_ADD_DBL
+#define NO_ECC_SIGN
+#define NO_ECC_VERIFY
+#define NO_ECC_SECP
+#define ECC_SHAMIR
+
 /* ============================================================
  * Math backend (good for rv64 without asm)
  * ============================================================ */
-#ifndef USE_FAST_MATH
-#define USE_FAST_MATH 1
-#endif
-
-/* Force TFM, disable SP math */
+#define USE_FAST_MATH
 #undef WOLFSSL_SP
 #undef WOLFSSL_SP_MATH
 
@@ -69,7 +78,6 @@ extern "C"
 /* Harden against side-channel attacks */
 #define WC_RSA_BLINDING      /* Protects RSA private keys from timing attacks */
 #define TFM_TIMING_RESISTANT /* For the Fast Math library */
-#define ECC_TIMING_RESISTANT /* For the Elliptic Curve library */
 
 /* ============================================================
  * Profile A: OPENSSL_FULL_CRYPTO
@@ -81,10 +89,6 @@ extern "C"
 /* --- Public-key --- */
 #undef NO_RSA
 #undef NO_DH
-/* Curves: enable the common set so EC/BN are “complete” */
-#define ECC_USER_CURVES
-#define HAVE_ECC
-/* If you need 192/224 as well, add HAVE_ECC192/HAVE_ECC224 */
 
 /* --- Symmetric / AEAD --- */
 #define HAVE_AES
@@ -112,7 +116,7 @@ extern "C"
 
 /* --- ASN.1 / X.509 helpers (no TLS) --- */
 /* Keep ASN.1 on so you can parse/load PEM/DER keys if needed. */
-#undef NO_ASN_TIME /* leave time parsing on if loading certs */
+#define NO_ASN
     /* If you never parse certificates/keys, you may later define NO_CERTS. */
 
     /* --- Debug / strings (leave on while integrating) --- */

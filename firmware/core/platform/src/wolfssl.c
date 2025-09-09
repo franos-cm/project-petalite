@@ -1,3 +1,4 @@
+#include <sys/time.h>
 #include <stdint.h>
 #include <stddef.h>
 
@@ -16,6 +17,21 @@ int wolf_platform_rng_block(unsigned char *out, unsigned int sz)
     //     if (got == 0)   return -1;              /* no progress => fail */
     //     off += (uint32_t)got;
     // }
+    return 0;
+}
+
+#include <sys/time.h>
+#include <stdint.h>
+
+/* Minimal stub. TODO: Improve later to read a real hardware timer. */
+int gettimeofday(struct timeval *tv, void *tz)
+{
+    (void)tz;
+    if (tv)
+    {
+        tv->tv_sec = 0;
+        tv->tv_usec = 0;
+    }
     return 0;
 }
 

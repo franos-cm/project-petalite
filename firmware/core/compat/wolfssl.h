@@ -49,4 +49,30 @@
 #define OID_ECDSA_wolfSSL_SHA512 OID_ECDSA_SHA512
 #endif
 
+#ifndef TPM_WOLFSSL_AES_WRAPPERS
+#define TPM_WOLFSSL_AES_WRAPPERS
+
+#include <wolfssl/wolfcrypt/aes.h>
+#include <public/BaseTypes.h>
+
+// TODO: revise teh functions below
+
+/* TPM core expects:
+ *   void TpmCryptEncryptAES(void*, BYTE*, const BYTE*);
+ *   void TpmCryptDecryptAES(void*, BYTE*, const BYTE*);
+ * wolfSSL provides int wc_AesEncrypt/Decrypt(Aes*, byte*, const byte*).
+ * Wrap them to avoid incompatible function pointer casts (and UB).
+ */
+static inline void
+TpmCryptEncryptAES(void *keySchedule, BYTE *out, const BYTE *in)
+{
+    (void)wc_AesEncryptDirect((Aes *)keySchedule, out, in); /* discard status */
+}
+
+static inline void TpmCryptDecryptAES(void *keySchedule, BYTE *out, const BYTE *in)
+{
+    (void)wc_AesDecryptDirect((Aes *)keySchedule, out, in); /* discard status */
+}
+#endif /* TPM_WOLFSSL_AES_WRAPPERS */
+
 #endif /* WOLFSSL_COMPAT_H */

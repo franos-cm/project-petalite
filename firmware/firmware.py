@@ -68,10 +68,11 @@ def copy_artifacts(fw_dir: Path, out_dir: Path, firmware_name: str, make_fbi: bo
 
 
 def add_common(sp):
-    sp.add_argument("--build-path", default="builds/soc")
-    sp.add_argument("--firmware-name", default="firmware")
     default_fwdir = Path(__file__).parent
     sp.add_argument("--fw-dir", default=default_fwdir)
+    sp.add_argument("--build-path", default="builds/soc")
+    sp.add_argument("--firmware-name", default="firmware")
+    sp.add_argument("--output-dir", default="builds")
 
 
 def main():
@@ -82,33 +83,42 @@ def main():
     sp_build = sub.add_parser("build", help="Build firmware (.bin); copy artifacts")
     add_common(sp_build)
     sp_build.add_argument("--mem", default="rom")
-    sp_build.add_argument("--output-dir", default="build-firmware")
     sp_build.add_argument("--fbi", action="store_true")
+    sp_build.add_argument("--firmware-build-dir", default="builds/firmware")
 
     sp_wolf = sub.add_parser("wolfssl-build", help="Build/install wolfSSL only")
     add_common(sp_wolf)
+
     sp_cw = sub.add_parser("wolfssl-clean", help="Clean wolfSSL build/install")
     add_common(sp_cw)
+
     sp_clean = sub.add_parser("clean", help="Run 'make clean'")
     add_common(sp_clean)
+
     sp_show = sub.add_parser("show", help="Run 'make show'")
     add_common(sp_show)
+
     sp_show_inc = sub.add_parser("show-includes", help="Run 'make show-includes'")
     add_common(sp_show_inc)
+
     sp_cc_inc = sub.add_parser("cc-include-search", help="Run 'make cc-include-search'")
     add_common(sp_cc_inc)
+
     sp_tpm = sub.add_parser("tpm-build", help="Build TPM+platform+compat static lib")
     add_common(sp_tpm)
+
     sp_tpm_clean = sub.add_parser("tpm-clean", help="Clean TPM static lib build")
     add_common(sp_tpm_clean)
+
     sp_tpm_flags = sub.add_parser("show-tpm-flags", help="Clean TPM static lib build")
     add_common(sp_tpm_flags)
-    sp_list = sub.add_parser(
-        "list-tpm-sources", help="List TPM/platform/compat sources"
-    )
+
+    sp_list = sub.add_parser("list-tpm-sources", help="List TPM/ sources")
     add_common(sp_list)
 
-    # NEW: show-cflags
+    libs_flags = sub.add_parser("show-soc-libs", help="Clean TPM static lib build")
+    add_common(libs_flags)
+
     sp_show_cflags = sub.add_parser("show-flags", help="Run 'make show-cflags'")
     add_common(sp_show_cflags)
     sp_show_wolfssl_cflags = sub.add_parser(
@@ -134,6 +144,14 @@ def main():
         return
     elif args.cmd == "clean":
         run(["make", "clean"], cwd=fw_dir, env=env)
+        for ext in (".bin", ".fbi"):
+            art = Path(args.output_dir) / f"{args.firmware_name}{ext}"
+            if art.exists():
+                try:
+                    art.unlink()
+                    print(f"+ removed {art}")
+                except OSError as e:
+                    print(f"warn: could not remove {art}: {e}", file=sys.stderr)
         return
     elif args.cmd == "show":
         run(["make", "show"], cwd=fw_dir, env=env)
@@ -162,13 +180,16 @@ def main():
     elif args.cmd == "list-tpm-sources":
         run(["make", "list-tpm-sources"], cwd=fw_dir, env=env)
         return
+    elif args.cmd == "show-soc-libs":
+        run(["make", "show-soc-libs"], cwd=fw_dir, env=env)
+        return
 
     elif args.cmd == "build":
         ld = fw_dir / "linker.ld"
         with maybe_patch_linker(ld, args.mem):
             run(["make"], cwd=fw_dir, env=env)
         copy_artifacts(
-            fw_dir,
+            Path(args.firmware_build_dir).resolve(),
             Path(args.output_dir).resolve(),
             args.firmware_name,
             make_fbi=args.fbi,
