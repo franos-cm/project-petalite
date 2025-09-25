@@ -32,7 +32,7 @@ class PetaliteCore(SoCCore):
         platform: GenericPlatform,
         sys_clk_freq: int,
         comm_protocol: CommProtocol,
-        integrated_rom_init: str = None,
+        integrated_rom_path: str = None,
         nvm_mem_init: str = None,
         debug_bridge: bool = False,
         trace: bool = False,
@@ -40,6 +40,18 @@ class PetaliteCore(SoCCore):
         self.platform_instance = platform
         self.is_simulated = isinstance(platform, SimPlatform)
         self.comm_protocol = comm_protocol
+        self.bus_data_width = 64
+
+        # In theory, we could pass the integrated_rom_init to the SoC intiializer
+        # In practice, there is a bug by which if you do that, the size of the ROM is incorrectly calculated
+        # So for now we pass the integrated_rom_init as a list of the instructions, but we should do a Litex PR for that
+        # For that, we need do know the data_width and endianness of the CPU a priori, which is fine,
+        # as long as we remember to change it if we switch CPUs
+        integrated_rom_data = (
+            get_mem_data(integrated_rom_path, data_width=64, endianness="little")
+            if integrated_rom_path
+            else []
+        )
 
         # SoC with CPU
         SoCCore.__init__(
@@ -58,7 +70,7 @@ class PetaliteCore(SoCCore):
             # Memory specs
             integrated_rom_size=0x20000,
             integrated_sram_size=0x2000,
-            integrated_rom_init=integrated_rom_init,
+            integrated_rom_init=integrated_rom_data,
             # integrated_main_ram_size=0x1_0000,  # TODO: cant use main_ram because of SBI...
         )
 
@@ -185,7 +197,7 @@ def main():
         platform=platform,
         sys_clk_freq=args.sys_clk_freq,
         comm_protocol=args.comm,
-        integrated_rom_init=args.firmware,
+        integrated_rom_path=args.firmware,
         trace=args.trace,
         debug_bridge=args.debug_bridge,
     )
