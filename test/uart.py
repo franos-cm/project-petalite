@@ -153,10 +153,10 @@ class UARTConnection:
             except queue.Empty:
                 continue
 
-        print(f"[TIMEOUT] No ACK received in {timeout:.3f} seconds")
+        print(f"[TIMEOUT] No {signal_name.upper()} received in {timeout:.3f} seconds")
         return False
 
-    def _wait_for_bytes(self, num_bytes, timeout=5):
+    def wait_for_bytes(self, num_bytes, timeout=5):
         """Wait for specific number of bytes"""
         start_time = time.perf_counter()
         buffer = b""
@@ -200,7 +200,7 @@ class UARTConnection:
     def get_response_header(self, timeout=1200):
         self.wait_for_start()
         self.send_ack()
-        response_header = self._wait_for_bytes(num_bytes=4, timeout=timeout)
+        response_header = self.wait_for_bytes(num_bytes=4, timeout=timeout)
         self.send_ack()
         return response_header
 
@@ -271,7 +271,7 @@ class UARTConnection:
                 )
 
             # Wait for the next chunk of data
-            data_chunk = self._wait_for_bytes(
+            data_chunk = self.wait_for_bytes(
                 num_bytes=bytes_to_receive, timeout=timeout_per_chunk
             )
 
