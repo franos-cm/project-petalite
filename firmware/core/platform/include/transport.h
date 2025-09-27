@@ -7,7 +7,7 @@
 #include <irq.h>
 #include <generated/csr.h>
 #include <libbase/uart.h>
-#include "shared.h"
+#include "platform.h"
 
 // ---- TPM-specific sizes ----
 #define TPM_HEADER_LEN 10u    // 2(tag) + 4(size) + 4(code)
@@ -39,7 +39,12 @@ typedef enum
 
 void transport_irq_init(void);
 uint32_t transport_get_cmd_len(void);
+uint32_t transport_get_bytes_read(void);
 bool transport_ingestion_done(void);
 uint32_t transport_read_command(void);
+void transport_write_byte(uint8_t b);
+void transport_write_rsp(const uint8_t *buf, uint32_t len);
+void _debug_transport_write_ready(void);
+void debug_breakpoint(uint8_t b);
 
 #endif // TRANSPORT_H

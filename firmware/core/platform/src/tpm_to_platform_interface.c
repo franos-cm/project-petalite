@@ -34,11 +34,6 @@ static volatile int s_power_lost_latch = 0;
 // - s_nv_image: "committed" persistent image
 // - s_nv_shadow: staging area modified by NvMemoryWrite/Clear/Move
 // - s_nv_dirty: tracks if shadow differs and Commit is needed
-#ifndef NV_MEMORY_SIZE
-// If profile didn't define it, pick a small default to compile.
-// Replace with real value from your chosen TPM profile.
-#define NV_MEMORY_SIZE 4096u
-#endif
 static uint8_t s_nv_image[NV_MEMORY_SIZE];
 static uint8_t s_nv_shadow[NV_MEMORY_SIZE];
 static int s_nv_dirty = 0;
@@ -62,19 +57,33 @@ static inline uint32_t fourcc(const char a[4])
 void _plat__Tick1ms(void) { s_tick_ms++; }
 
 // If your platform detects a power-loss/restore, call this once on boot.
-void _plat__Signal_PowerOn(void)
+int _plat__Signal_PowerOn(void)
 {
     s_power_lost_latch = 1;
     // If your hardware timer might have gone backwards across power,
     // call _plat__TimerReset() semantics:
     s_timer_reset_flag = 1;
+
+    return 0;
+}
+
+//*** _plat_Signal_Reset()
+// This a TPM reset without a power loss.
+int _plat__Signal_Reset(void)
+{
+    // Command cancel
+    s_cancel_flag = 0;
+
+    _TPM_Init();
+
+    return 0;
 }
 
 // If your platform can suspend the tick, call this on stop/start:
 void _plat__Signal_TimerStopped(void) { s_timer_stopped_flag = 1; }
 
 // Optional: set/clear cancel flag from host/GPIO/UART command
-void _plat__SetCancel(int on) { s_cancel_flag = (on != 0); }
+void _plat__SetCancel(void) { s_cancel_flag = 1; }
 
 // ---------- Cancel.c ----------
 

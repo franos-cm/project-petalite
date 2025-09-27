@@ -64,12 +64,13 @@ extern "C"
 #define NO_ECC_SECP
 #define ECC_SHAMIR
 
+// Possibly faster/solve bugs, test it later
+// #define FP_ECC
+
 /* ============================================================
  * Math backend (good for rv64 without asm)
  * ============================================================ */
 #define USE_FAST_MATH
-#undef WOLFSSL_SP
-#undef WOLFSSL_SP_MATH
 
 /* If you do very large RSA, consider setting FP_MAX_BITS, otherwise default is fine */
 // Needed for some tpm features

@@ -1,5 +1,9 @@
 #include "transport.h"
 
+// TODO: refactor this so we have error treatment, and so the API is generally better
+// For example, forcing the reset when reading the command is weird and forces main to do weirder stuff
+// But for now, I guess it works...
+
 // Global vars for the interrupt service
 static rx_state_t rx_state = RX_WAITING_FOR_HEADER;
 static rx_return_code_t rx_code = SUCCESSFUL;
@@ -61,6 +65,9 @@ static void rx_isr(void)
 
         if (rx_state == RX_WAITING_FOR_BODY && bytes_collected == expected_cmd_len)
             rx_state = RX_COMMAND_READY;
+
+        // Ack every byte (mirrors libbase pattern)
+        uart_ev_pending_write(UART_EV_RX);
     }
 }
 
@@ -101,8 +108,14 @@ inline uint32_t transport_get_cmd_len(void)
     return expected_cmd_len;
 }
 
+inline uint32_t transport_get_bytes_read(void)
+{
+    return bytes_collected;
+}
+
 inline bool transport_ingestion_done(void)
 {
+    asm volatile("nop"); // TODO: this shouldnt be necessary here but seems to work
     return (rx_state == RX_COMMAND_READY) || (rx_state == RX_ERROR);
 }
 
@@ -116,4 +129,52 @@ uint32_t transport_read_command(void)
     // uart_ev_enable_write(en | UART_EV_RX);
 
     return rx_code;
+}
+
+// TODO: make this better
+void transport_write_byte(uint8_t b)
+{
+    while (uart_txfull_read())
+    {
+    }
+    uart_rxtx_write(b);
+    // The TX event isn't enabled, but clearing it is good practice
+    uart_ev_pending_write(UART_EV_TX);
+}
+
+void transport_write_rsp(const uint8_t *buf, uint32_t len)
+{
+    for (uint32_t i = 0; i < len; i++)
+    {
+        transport_write_byte(buf[i]);
+    }
+}
+
+void _debug_transport_write_ready(void)
+{
+    transport_write_byte(0xA0);
+}
+
+void debug_breakpoint(uint8_t b)
+{
+    if (b == 0xA0)
+    {
+        return;
+    }
+
+    int interval = 50;
+    int counter_max = 1;
+
+    int i = 0;
+    int counter = 0;
+    while (counter < counter_max)
+    {
+        i++;
+        if (i > interval)
+        {
+            transport_write_byte(b);
+            i = 0;
+            counter++;
+        }
+    }
 }
