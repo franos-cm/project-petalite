@@ -11,6 +11,7 @@ from litex.soc.interconnect import wishbone
 from litex.build.sim import SimPlatform
 from litex.build.sim.config import SimConfig
 from litex.build.generic_platform import GenericPlatform
+from litex_boards.platforms import digilent_netfpga_sume
 
 from liteeth.phy.model import LiteEthPHYModel
 from liteeth.common import convert_ip
@@ -19,17 +20,37 @@ from litespi.phy.model import LiteSPIPHYModel
 from litespi.modules import S25FL128L
 from litespi.opcodes import SpiNorFlashOpCodes as Codes
 
-from dilithium import Dilithium
+from dilithium import Dilithium, add_dilithium_src
 from platforms import PetaliteSimPlatform
-from helpers import arg_parser, generate_gtkw_savefile, CommProtocol
-
-from enum import IntEnum
+from helpers import arg_parser, generate_gtkw_savefile, CommProtocol, KBYTE
 
 
-class ByteValues(IntEnum):
-    BYTE = 1
-    KBYTE = 1024
-    MBYTE = 1024**2
+from migen import *
+from litex.gen import *
+from litex.soc.cores.clock import *
+from litedram.modules import MT8KTF51264
+from litedram.phy import s7ddrphy
+
+
+class _CRG(LiteXModule):
+    def __init__(self, platform, sys_clk_freq):
+        self.rst = Signal()
+        self.cd_sys = ClockDomain()
+        self.cd_sys4x = ClockDomain()
+        self.cd_idelay = ClockDomain()
+        self.cd_sfp = ClockDomain()
+
+        self.pll = pll = S7PLL(speedgrade=-2)
+        self.comb += pll.reset.eq(platform.request("cpu_reset_n") | self.rst)
+        pll.register_clkin(platform.request("clk200"), 200e6)
+        pll.create_clkout(self.cd_sys, sys_clk_freq)
+        pll.create_clkout(self.cd_sys4x, 4 * sys_clk_freq)
+        pll.create_clkout(self.cd_idelay, 200e6)
+        pll.create_clkout(self.cd_sfp, 200e6)
+
+        platform.add_false_path_constraints(self.cd_sys.clk, pll.clkin)
+
+        self.idelayctrl = S7IDELAYCTRL(self.cd_idelay)
 
 
 class PetaliteCore(SoCCore):
@@ -47,6 +68,7 @@ class PetaliteCore(SoCCore):
     ):
         self.platform_instance = platform
         self.is_simulated = isinstance(platform, SimPlatform)
+        self.sys_clk_freq = sys_clk_freq
         self.comm_protocol = comm_protocol
 
         # SoC with CPU
@@ -64,8 +86,9 @@ class PetaliteCore(SoCCore):
             # Communication
             with_uart=False,
             # Memory specs, considering full TPM firmware
-            integrated_rom_size=200 * ByteValues.KBYTE,
-            integrated_sram_size=70 * ByteValues.KBYTE,
+            # Increase SRAM size if we need more heap/stack mem
+            integrated_rom_size=210 * KBYTE,
+            integrated_sram_size=128 * KBYTE,
             integrated_rom_init=integrated_rom_init,
             # integrated_main_ram_size=0x1_0000,  # TODO: cant use main_ram because of SBI...
         )
@@ -86,17 +109,37 @@ class PetaliteCore(SoCCore):
         if trace:
             trace_reset_on = True
             self.platform_instance.add_debug(self, reset=1 if trace_reset_on else 0)
-        else:
+        elif self.is_simulated:
             self.comb += self.platform_instance.trace.eq(1)
+
+        # SUME stuff ----------------------------------------------------------------------
+        if not self.is_simulated and not self.integrated_main_ram_size:
+            self.ddrphy = s7ddrphy.V7DDRPHY(
+                platform.request("ddram"),
+                memtype="DDR3",
+                nphases=4,
+                sys_clk_freq=sys_clk_freq,
+            )
+            self.add_sdram(
+                "sdram",
+                phy=self.ddrphy,
+                module=MT8KTF51264(sys_clk_freq, "1:4"),
+                size=0x40000000,
+                l2_cache_size=8192,
+            )
 
     def setup_clk(self: SoCCore):
         if self.is_simulated:
             self.crg = CRG(self.platform_instance.request("sys_clk"))
+        else:
+            self.crg = _CRG(self.platform, self.sys_clk_freq)
 
     def setup_mem_map(self: SoCCore):
         # Simple IO memory bump-allocator
-        self._io_base = 0x3000_0000  # start of your IO window
-        self._io_limit = 0x3001_0000  # optional safety limit (64 KiB here)
+        # TODO: revise this IO start address, because it probably
+        #       assumes changing the default Rocket memory map
+        self._io_base = 0x4100_0000  # start of your IO window
+        self._io_limit = 0x4200_0000  # optional safety limit (64 KiB here)
         self._io_cur = self._io_base
 
     def add_io_buffer(
@@ -146,7 +189,7 @@ class PetaliteCore(SoCCore):
             # Add io buffers for receiving commands
             self.add_io_buffer(
                 name="tpm_cmd_buffer",
-                size=4 * 1024,
+                size=4 * KBYTE,
                 mode="rw",
                 custom=True,
             )
@@ -188,7 +231,7 @@ class PetaliteCore(SoCCore):
         # We also had to add an extra param to the add_ram method to account for that.
         self.add_io_buffer(
             name="dilithium_buffer",
-            size=10 * 1024,  # NOTE: 10 kB for sim, but final design could have 8 kB
+            size=10 * KBYTE,  # NOTE: 10 kB for sim, but final design could have 8 kB
             mode="rw",
             custom=True,
         )
@@ -224,15 +267,15 @@ class PetaliteCore(SoCCore):
 
 
 def main():
-    # TODO: check LitePCIeSoC
     args = arg_parser()
 
     # Platform definition
     platform = (
-        PetaliteSimPlatform(io_path=args.io_json, rtl_dir_path=args.rtl_dir_path)
+        PetaliteSimPlatform(io_path=args.io_json)
         if args.sim
-        else None
+        else digilent_netfpga_sume.Platform()
     )
+    add_dilithium_src(platform=platform, top_level_dir_path=args.rtl_dir_path)
 
     # SoC definition
     soc = PetaliteCore(
@@ -279,7 +322,7 @@ def main():
 
         if args.load:
             prog = platform.create_programmer()
-            prog.load_bitstream(builder.get_bitstream_filename(mode="sram"), device=1)
+            prog.load_bitstream(builder.get_bitstream_filename(mode="sram"))
 
 
 if __name__ == "__main__":
