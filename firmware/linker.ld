@@ -80,9 +80,13 @@ SECTIONS
 }
 
 PROVIDE(_fstack = ORIGIN(sram) + LENGTH(sram));
+PROVIDE(_fstack_size = 16K);
+
+ASSERT(SIZEOF(.data) + SIZEOF(.bss) + _fstack_size <= LENGTH(sram),
+       "SRAM too small for data+bss+stack reserve");
 
 PROVIDE (__heap_start = _end);
-PROVIDE (__heap_end = _fstack - (DEFINED(_fstack_size) ? _fstack_size : 16384));
+PROVIDE (__heap_end = _fstack - _fstack_size);
 PROVIDE (__heap_size = __heap_end - __heap_start);
 
 PROVIDE(_fdata_rom = LOADADDR(.data));

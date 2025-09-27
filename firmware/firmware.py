@@ -6,11 +6,10 @@ import shutil
 import subprocess
 from pathlib import Path
 from contextlib import contextmanager
-from litex.build.tools import replace_in_file  # use LiteX helper
+from litex.build.tools import replace_in_file
+
 
 # ---------- helpers ----------
-
-
 def run(cmd, cwd=None, env=None):
     print("+ " + " ".join(cmd), flush=True)
     subprocess.run(cmd, cwd=cwd, env=env, check=True)
@@ -126,6 +125,11 @@ def main():
     )
     add_common(sp_show_wolfssl_cflags)
 
+    sp_bin_clean = sub.add_parser(
+        "firmware-clean", help="Remove copied firmware .bin/.fbi artifacts only"
+    )
+    add_common(sp_bin_clean)
+
     args = p.parse_args()
 
     fw_dir = Path(args.fw_dir).resolve()
@@ -182,6 +186,22 @@ def main():
         return
     elif args.cmd == "show-soc-libs":
         run(["make", "show-soc-libs"], cwd=fw_dir, env=env)
+        return
+    elif args.cmd == "firmware-clean":
+        run(["make", "firmware-clean"], cwd=fw_dir, env=env)
+
+        removed_any = False
+        for ext in (".bin", ".fbi"):
+            art = Path(args.output_dir) / f"{args.firmware_name}{ext}"
+            if art.exists():
+                try:
+                    art.unlink()
+                    print(f"+ removed {art}")
+                    removed_any = True
+                except OSError as e:
+                    print(f"warn: could not remove {art}: {e}", file=sys.stderr)
+        if not removed_any:
+            print("(no firmware artifacts to remove)")
         return
 
     elif args.cmd == "build":

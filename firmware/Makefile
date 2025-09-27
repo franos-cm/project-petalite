@@ -115,7 +115,9 @@ LDFLAGS += -flto
 .PHONY: wolfssl-build wolfssl-clean wolfssl-ready
 
 # Keep wolfSSL compile flags minimal and freestanding; avoid firmware LDFLAGS
-WOLFSSL_CFLAGS  := $(CFLAGS) -I$(CONFIG_DIR) \
+WOLFSSL_INCLUDES := -I$(CONFIG_DIR)
+
+WOLFSSL_CFLAGS  := $(CFLAGS) $(WOLFSSL_INCLUDES) \
                    -DHAVE_SYS_TIME_H -Wno-error=cpp
 
 wolfssl-build:
@@ -253,6 +255,8 @@ FIRMWARE_CFLAGS := $(CFLAGS) $(TPM_INCLUDES) \
                    -include "$(OSSL_INC)/ssl.h" \
 				   -Wno-error=cpp \
 				   -Wno-strict-prototypes
+# NOTE: this last one is only necessary for debugging
+FIRMWARE_CFLAGS += $(TPM_DEFS)
 
 $(FIRMWARE_BUILD_DIR)/%.o: $(APP_DIR)/%.c | wolfssl-ready
 	@mkdir -p $(dir $@)
@@ -281,9 +285,12 @@ $(FIRMWARE_BIN): $(FIRMWARE_ELF)
 	$(OBJCOPY_PATH) -O binary $< $@
 
 # Default target
-.PHONY: all
+.PHONY: all firmware-clean
 all: $(FIRMWARE_BIN)
 	@echo "Built $@"
+
+firmware-clean:
+	$(RM) -r $(FIRMWARE_BUILD_DIR)
 
 # Track deps of firmware objects too
 -include $(FIRMWARE_OBJS:.o=.d) $(STARTUP_OBJ:.o=.d)
