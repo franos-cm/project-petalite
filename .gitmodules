@@ -1,0 +1,4 @@
+[submodule "dilithium-rtl"]
+	path = dilithium-rtl
+	url = https://github.com/franos-cm/dilithium-rtl.git
+	branch = petalite-compat

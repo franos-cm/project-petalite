@@ -60,7 +60,7 @@ def arg_parser():
     parser.add_argument(
         "--rtl-dir-path",
         type=str,
-        default="./dilithium-hw",
+        default="./dilithium-rtl",
         help="Directory path for custom cores",
     )
     parser.add_argument(
@@ -93,7 +93,6 @@ def arg_parser():
     )
 
     args = parser.parse_args()
-    print(args.sim)
     if args.sim and not args.io_json:
         parser.error("Simulated platform requires a pin map json.")
     if args.load and not args.firmware:
