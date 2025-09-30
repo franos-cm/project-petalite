@@ -140,7 +140,13 @@ class SimpleSoCListener:
         debug: bool = True,
         buffer_limit: int = 8192,
     ):
-        self.uart = UARTConnection(port=port, host=host, debug=debug, max_wait=max_wait)
+        self.uart = UARTConnection(
+            mode="tcp",
+            tcp_port=port,
+            tcp_host=host,
+            tcp_connect_timeout=max_wait,
+            debug=debug,
+        )
         self.triggers: List[Trigger] = triggers or []
         self.buffer = bytearray()
         self.buffer_limit = buffer_limit

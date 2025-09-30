@@ -1,5 +1,6 @@
 import time
 import socket
+import errno
 
 try:
     import serial  # pyserial (optional when using TCP only)
@@ -110,21 +111,29 @@ class UARTConnection:
         print("Read/Write threads started")
 
     def _open_tcp(self, host, port, max_wait):
-        """Retry TCP connection to simulation until timeout"""
-        print(f"Connecting (TCP) to {host}:{port}... (will wait up to {max_wait}s)")
-        sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+        """Retry TCP connection to simulation until timeout (original style)"""
+        print(f"Connecting to {host}:{port}... (will wait up to {max_wait}s)")
 
         try_count = 0
         start_time = time.time()
 
         while time.time() - start_time < max_wait:
             try:
+                # Create a fresh socket each attempt (mirrors original semantics, avoids bad states)
+                sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
                 sock.connect((host, port))
                 elapsed = time.time() - start_time
                 print(f"✅ Connected to simulation after {elapsed:.2f} seconds!")
+                # Preserve original attribute name for parity
+                self.sock = sock
                 self.transport = _SocketTransport(sock)
                 return
+
             except (ConnectionRefusedError, socket.timeout):
+                try:
+                    sock.close()
+                except Exception:
+                    pass
                 elapsed = time.time() - start_time
                 print(
                     f"[{elapsed:.2f}s] Simulation not ready yet (attempt {try_count}). Retrying..."
@@ -165,6 +174,9 @@ class UARTConnection:
                     self.received_data.put(("data", data, time.time()))
                     if self.debug:
                         print(f"[READ] {data.hex()}")
+            except socket.timeout:
+                # Non-fatal: simply try again
+                continue
             except Exception as e:
                 if self.running:
                     print(f"[READ ERROR] {e}")
@@ -227,22 +239,14 @@ class UARTConnection:
                 msg_type, data, timestamp = item
 
                 if msg_type == "data" and data:
-                    # Scan for the expected byte; preserve trailing bytes
-                    try:
-                        idx = data.index(expected_byte)
-                        # Push back any bytes AFTER the expected marker to preserve stream
-                        trailing = data[idx + 1 :]
-                        if trailing:
-                            self.received_data.put(("data", trailing, time.time()))
-                        if signal_name:
-                            elapsed = time.perf_counter() - start_time
-                            print(
-                                f"[{signal_name.upper()}] Received in {elapsed:.3f} seconds"
-                            )
-                        return True
-                    except ValueError:
-                        # expected byte not in this chunk; continue
-                        pass
+                    for byte in data:
+                        if byte == expected_byte:
+                            if signal_name:
+                                elapsed = time.perf_counter() - start_time
+                                print(
+                                    f"[{signal_name.upper()}] Received in {elapsed:.3f} seconds"
+                                )
+                            return True
 
                 elif msg_type == "error":
                     print(f"[ERROR] {data}")
@@ -278,10 +282,7 @@ class UARTConnection:
             except queue.Empty:
                 continue
 
-        # Timeout: push back partial data (if any) and signal no full result
-        if buffer:
-            self.received_data.put(("data", buffer, time.time()))
-        return None
+        return buffer if buffer else None
 
     def wait_for_ack(self, timeout=120):
         return self._wait_for_byte(

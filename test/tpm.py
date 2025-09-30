@@ -1,4 +1,5 @@
 import time
+import argparse
 from uart import UARTConnection
 
 
@@ -120,13 +121,51 @@ class TpmTester:
         return result
 
 
+def parse_args():
+    parser = argparse.ArgumentParser(description="TPM tester over UART or TCP")
+    mode_group = parser.add_mutually_exclusive_group()
+    mode_group.add_argument(
+        "--serial",
+        dest="use_serial",
+        action="store_true",
+        help="Use serial connection instead of tcp",
+    )
+    mode_group.add_argument(
+        "--tcp",
+        dest="use_serial",
+        action="store_false",
+        help="Use TCP connection",
+    )
+    parser.set_defaults(use_serial=False)
+
+    parser.add_argument(
+        "--tcp-port",
+        type=int,
+        default=4327,
+        help="TCP port for TCP mode (default: 4327)",
+    )
+    parser.add_argument(
+        "--serial-dev",
+        type=str,
+        default="/dev/ttyUSB1",
+        help="Serial device path for serial mode (default: /dev/ttyUSB1)",
+    )
+    parser.add_argument(
+        "--baud",
+        type=int,
+        default=115200,
+        help="Baud rate for serial mode (default: 115200)",
+    )
+    return parser.parse_args()
+
+
 def main():
     print(f"\n=== Testing TPM ===")
-    # Choose connection mode here:
-    use_serial = True  # set True to talk to real hardware over UART
-    tcp_port = 4327
-    serial_dev = "/dev/ttyUSB1"  # adjust to your board (/dev/ttyUSB*, /dev/ttyACM*)
-    baud = 115200
+    args = parse_args()
+    use_serial = args.use_serial
+    tcp_port = args.tcp_port
+    serial_dev = args.serial_dev
+    baud = args.baud
 
     try:
         tester = TpmTester()
