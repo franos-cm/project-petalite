@@ -125,7 +125,7 @@ def main():
     # Choose connection mode here:
     use_serial = True  # set True to talk to real hardware over UART
     tcp_port = 4327
-    serial_dev = "/dev/ttyUSB0"  # adjust to your board (/dev/ttyUSB*, /dev/ttyACM*)
+    serial_dev = "/dev/ttyUSB1"  # adjust to your board (/dev/ttyUSB*, /dev/ttyACM*)
     baud = 115200
 
     try:
