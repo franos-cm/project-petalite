@@ -33,9 +33,15 @@ sudo apt-get update
 sudo apt-get install locales
 sudo locale-gen en_US.UTF-8
 sudo update-locale
-source /tools/Xilinx/Vivado/2024.2/settings64.sh
+source /tools/Xilinx/2023.1/Vivado/2023.1/settings64.sh
 source /tools/Xilinx/2025.1.1/Vivado/settings64.sh
 vivado&
+
+-- If installing older version of Vivado (like 2023.1), also do:
+wget http://security.ubuntu.com/ubuntu/pool/universe/n/ncurses/libtinfo5_6.3-2ubuntu0.1_amd64.deb
+sudo apt install ./libtinfo5_6.3-2ubuntu0.1_amd64.deb
+wget http://security.ubuntu.com/ubuntu/pool/universe/n/ncurses/libncurses5_6.3-2ubuntu0.1_amd64.deb
+sudo apt install ./libtinfo5_6.3-2ubuntu0.1_amd64.deb
 
 
 -- GTKWave
@@ -83,6 +89,12 @@ puts $::env(LM_LICENSE_FILE)
 source /tools/Xilinx/2025.1.1/Vivado/settings64.sh
 export PATH="/tools/verilator/v5.036-48-g0dc93c1d5/bin:$PATH"
 
+This is a fresh install.
+INFO Could not detect the display scale (hDPI).
+       If you are using a high resolution monitor, you can set the insaller scale factor like this: 
+       export XINSTALLER_SCALE=2
+       setenv XINSTALLER_SCALE 2
+
 ./build.sh
 ./build.sh --force-all
 ./soc/petalite.py --sim --io-json=soc/data/io_sim.json --build-dir=builds/soc --compile-gateware --firmware=builds/firmware.bin --load
@@ -90,7 +102,7 @@ OPTIONALLY: --load --trace --debug-bridge
 
 ./build.sh --board
 ./build.sh --force-all --board
-./soc/petalite.py --build-dir=builds/soc --compile-gateware --firmware=builds/firmware.bin
+./soc/petalite.py --build-dir=builds/soc --compile-gateware --firmware=builds/firmware.bin > synth_log_v4.txt
 OPTIONALLY: --load --trace --debug-bridge
 
 BOARD IS xc7vx690tffg1761-3

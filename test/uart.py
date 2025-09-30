@@ -1,8 +1,13 @@
-import socket
 import time
+import socket
+
+try:
+    import serial  # pyserial (optional when using TCP only)
+except Exception:  # ImportError or runtime issues
+    serial = None
 import threading
 import queue
-from typing import List
+
 
 from utils import (
     DILITHIUM_ACK_BYTE,
@@ -13,13 +18,82 @@ from utils import (
 )
 
 
+class _SocketTransport:
+    def __init__(self, sock: socket.socket):
+        self.sock = sock
+
+    def settimeout(self, t: float):
+        self.sock.settimeout(t)
+
+    def recv(self, size: int) -> bytes:
+        return self.sock.recv(size)
+
+    def sendall(self, data: bytes):
+        self.sock.sendall(data)
+
+    def close(self):
+        self.sock.close()
+
+
+class _SerialTransport:
+    def __init__(self, ser):
+        self.ser = ser
+
+    def settimeout(self, t: float):
+        self.ser.timeout = t
+        self.ser.write_timeout = t
+
+    def recv(self, size: int) -> bytes:
+        # pyserial returns b'' on timeout
+        return self.ser.read(size)
+
+    def sendall(self, data: bytes):
+        # Ensure full write by looping until all bytes sent
+        total = 0
+        while total < len(data):
+            n = self.ser.write(data[total:])
+            if n is None:
+                n = 0
+            total += n
+
+    def close(self):
+        self.ser.close()
+
+
 class UARTConnection:
     """Clean UART communication class - handles only communication"""
 
-    def __init__(self, host="localhost", port=4327, debug: bool = True, max_wait=600):
+    def __init__(
+        self,
+        mode: str = "tcp",
+        tcp_host: str = "localhost",
+        tcp_port: int = 4327,
+        tcp_connect_timeout: int = 600,
+        # Serial parameters
+        serial_port: str | None = "/dev/ttyUSB1",
+        baudrate: int = 115200,
+        serial_timeout: float = 0.1,
+        debug: bool = True,
+    ):
         self.debug = debug
         self.running = False
-        self._wait_for_sim_connection(host=host, port=port, max_wait=max_wait)
+
+        # NEW: transport abstraction with TCP or Serial
+        self.transport = None
+        if mode == "serial":
+            if serial is None:
+                raise RuntimeError(
+                    "pyserial is required for serial mode. Install with: pip install pyserial"
+                )
+            if not serial_port:
+                raise RuntimeError("serial_port must be provided in serial mode.")
+            self._open_serial(
+                serial_port=serial_port, baudrate=baudrate, timeout=serial_timeout
+            )
+        elif mode == "tcp":
+            self._open_tcp(host=tcp_host, port=tcp_port, max_wait=tcp_connect_timeout)
+        else:
+            raise ValueError("mode must be 'tcp' or 'serial'")
 
         # Thread-safe queues
         self.received_data = queue.Queue()
@@ -35,21 +109,21 @@ class UARTConnection:
 
         print("Read/Write threads started")
 
-    def _wait_for_sim_connection(self, host, port, max_wait):
+    def _open_tcp(self, host, port, max_wait):
         """Retry TCP connection to simulation until timeout"""
-        print(f"Connecting to {host}:{port}... (will wait up to {max_wait}s)")
-        self.sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+        print(f"Connecting (TCP) to {host}:{port}... (will wait up to {max_wait}s)")
+        sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
 
         try_count = 0
         start_time = time.time()
 
         while time.time() - start_time < max_wait:
             try:
-                self.sock.connect((host, port))
+                sock.connect((host, port))
                 elapsed = time.time() - start_time
                 print(f"✅ Connected to simulation after {elapsed:.2f} seconds!")
+                self.transport = _SocketTransport(sock)
                 return
-
             except (ConnectionRefusedError, socket.timeout):
                 elapsed = time.time() - start_time
                 print(
@@ -62,19 +136,35 @@ class UARTConnection:
             f"❌ Could not connect to simulation at {host}:{port} after {max_wait} seconds"
         )
 
+    # NEW: Serial opener
+    def _open_serial(self, serial_port: str, baudrate: int, timeout: float):
+        print(
+            f"Opening serial port {serial_port} @ {baudrate} baud (timeout={timeout}s)..."
+        )
+        ser = serial.Serial(
+            port=serial_port, baudrate=baudrate, timeout=timeout, write_timeout=timeout
+        )
+        # Flush any stale data
+        try:
+            ser.reset_input_buffer()
+            ser.reset_output_buffer()
+        except Exception:
+            pass
+        # Small delay to allow device reset (common on USB CDC)
+        time.sleep(0.1)
+        self.transport = _SerialTransport(ser)
+        print("✅ Serial port opened")
+
     def _read_worker(self):
-        """Background thread that continuously reads from socket"""
+        """Background thread that continuously reads from transport"""
         while self.running:
             try:
-                self.sock.settimeout(0.1)
-                data = self.sock.recv(64)
+                self.transport.settimeout(0.1)
+                data = self.transport.recv(64)
                 if data:
                     self.received_data.put(("data", data, time.time()))
                     if self.debug:
                         print(f"[READ] {data.hex()}")
-
-            except socket.timeout:
-                continue
             except Exception as e:
                 if self.running:
                     print(f"[READ ERROR] {e}")
@@ -100,7 +190,7 @@ class UARTConnection:
                     elif isinstance(command, int):
                         command = bytes([command])
 
-                    self.sock.sendall(command)
+                    self.transport.sendall(command)
                     self.send_queue.task_done()
             except queue.Empty:
                 continue
@@ -137,14 +227,22 @@ class UARTConnection:
                 msg_type, data, timestamp = item
 
                 if msg_type == "data" and data:
-                    for byte in data:
-                        if byte == expected_byte:
-                            if signal_name:
-                                elapsed = time.perf_counter() - start_time
-                                print(
-                                    f"[{signal_name.upper()}] Received in {elapsed:.3f} seconds"
-                                )
-                            return True
+                    # Scan for the expected byte; preserve trailing bytes
+                    try:
+                        idx = data.index(expected_byte)
+                        # Push back any bytes AFTER the expected marker to preserve stream
+                        trailing = data[idx + 1 :]
+                        if trailing:
+                            self.received_data.put(("data", trailing, time.time()))
+                        if signal_name:
+                            elapsed = time.perf_counter() - start_time
+                            print(
+                                f"[{signal_name.upper()}] Received in {elapsed:.3f} seconds"
+                            )
+                        return True
+                    except ValueError:
+                        # expected byte not in this chunk; continue
+                        pass
 
                 elif msg_type == "error":
                     print(f"[ERROR] {data}")
@@ -180,7 +278,10 @@ class UARTConnection:
             except queue.Empty:
                 continue
 
-        return buffer if buffer else None
+        # Timeout: push back partial data (if any) and signal no full result
+        if buffer:
+            self.received_data.put(("data", buffer, time.time()))
+        return None
 
     def wait_for_ack(self, timeout=120):
         return self._wait_for_byte(
@@ -218,7 +319,7 @@ class UARTConnection:
 
     def send_in_chunks(
         self,
-        data: List[bytes],
+        data: bytes | bytearray,
         chunk_size: int = BASE_ACK_GROUP_LENGTH,
         data_name: str = "",
     ):
@@ -318,5 +419,8 @@ class UARTConnection:
         self.running = False
         self.read_thread.join(timeout=1)
         self.write_thread.join(timeout=1)
-        self.sock.close()
+        try:
+            self.transport.close()
+        except Exception:
+            pass
         print("UART connection closed")

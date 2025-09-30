@@ -16,6 +16,7 @@
 
 //** Includes and locals
 #include "run_command.h"
+#include "transport.h"
 jmp_buf s_jumpBuffer;
 
 //** Functions
@@ -41,6 +42,23 @@ LIB_EXPORT void _plat__RunCommand(
 // This is the platform depended failure exit for the TPM.
 LIB_EXPORT NORETURN void _plat__Fail(void)
 {
+
+    // Emit marker before assertion so host can parse
+    debug_breakpoint(0xF2);
+#ifdef s_failLine
+    debug_breakpoint((UINT8)(s_failLine >> 8));
+    debug_breakpoint((UINT8)(s_failLine & 0xFF));
+#else
+    debug_breakpoint(0x00);
+    debug_breakpoint(0x01);
+#endif
+#ifdef s_failCode
+    debug_breakpoint((UINT8)(s_failCode >> 8));
+    debug_breakpoint((UINT8)(s_failCode & 0xFF));
+#else
+    debug_breakpoint(0x00);
+    debug_breakpoint(0x01);
+#endif
 
 #if ALLOW_FORCE_FAILURE_MODE
     // The simulator asserts during unexpected (i.e., un-forced) failure modes.

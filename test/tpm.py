@@ -122,13 +122,32 @@ class TpmTester:
 
 def main():
     print(f"\n=== Testing TPM ===")
-    port = 4327
+    # Choose connection mode here:
+    use_serial = True  # set True to talk to real hardware over UART
+    tcp_port = 4327
+    serial_dev = "/dev/ttyUSB0"  # adjust to your board (/dev/ttyUSB*, /dev/ttyACM*)
+    baud = 115200
 
     try:
         tester = TpmTester()
 
         # Create UART connection
-        uart = UARTConnection(port=port, max_wait=600)
+        if use_serial:
+            uart = UARTConnection(
+                mode="serial",
+                serial_port=serial_dev,
+                baudrate=baud,
+                serial_timeout=0.1,
+                debug=True,
+            )
+        else:
+            uart = UARTConnection(
+                mode="tcp",
+                tcp_host="localhost",
+                tcp_port=tcp_port,
+                tcp_connect_timeout=600,
+                debug=True,
+            )
 
         success = tester.test(uart_conn=uart)
         print(f"\n{'✅ Test passed!' if success else '❌ Test failed!'}")
