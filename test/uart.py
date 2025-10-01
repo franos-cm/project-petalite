@@ -255,15 +255,19 @@ class UARTConnection:
                 msg_type, data, timestamp = item
 
                 if msg_type == "data" and data:
-                    for byte in data:
+                    for idx, byte in enumerate(data):
                         if byte == expected_byte:
+                            # Push back any remaining bytes after the matched one
+                            if idx + 1 < len(data):
+                                remaining = data[idx + 1 :]
+                                self.received_data.put(("data", remaining, time.time()))
                             if signal_name:
                                 elapsed = time.perf_counter() - start_time
                                 print(
                                     f"[{signal_name.upper()}] Received in {elapsed:.3f} seconds"
                                 )
                             return True
-
+                    # No match in this chunk; continue
                 elif msg_type == "error":
                     print(f"{self._id()}[ERROR] {data}")
                     return False

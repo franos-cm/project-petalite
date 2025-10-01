@@ -24,7 +24,6 @@ class TpmTester:
         startup_bytestream = bytes.fromhex(startup_string)
         print("Sending startup command...")
         self.uart.send_bytes(startup_bytestream)
-        time.sleep(1)
 
         print("Waiting for startup answer...")
         self.wait_for_ready_signal()
@@ -40,7 +39,6 @@ class TpmTester:
         getrandom_bytestream = bytes.fromhex(getrandom_string)
         print("Sending get_random_bytes() command...")
         self.uart.send_bytes(getrandom_bytestream)
-        time.sleep(1)
 
         print("Waiting for get_random answer...")
         self.wait_for_ready_signal()
@@ -85,7 +83,6 @@ class TpmTester:
         create_primary_bytestream = bytes.fromhex(create_primary_cmd.replace(" ", ""))
         print("Sending create_primary() command...")
         self.uart.send_bytes(create_primary_bytestream)
-        time.sleep(1)
 
         print("Waiting for create_primary() answer...")
         self.wait_for_ready_signal()
@@ -104,14 +101,12 @@ class TpmTester:
     def test_random(self):
         self.wait_for_ready_signal()
         self.startup_cmd()
-        time.sleep(1)
         self.get_random_cmd()
         return True
 
     def test_create_primary(self):
         self.wait_for_ready_signal()
         self.startup_cmd()
-        time.sleep(1)
         self.create_primary_cmd()
         return True
 
