@@ -315,7 +315,12 @@ def main():
         )
 
         # Create UART connection
-        uart = UARTConnection(port=port, max_wait=600)
+        uart = UARTConnection(
+            mode="tcp",
+            tcp_port=port,
+            tcp_host="localhost",
+            tcp_connect_timeout=600,
+        )
 
         success = tester.test(
             uart_conn=uart,

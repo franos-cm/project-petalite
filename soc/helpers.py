@@ -2,6 +2,10 @@ import argparse
 import os
 from enum import StrEnum
 
+BYTE = 1
+KBYTE = 1024
+MBYTE = 1024**2
+
 
 class CommProtocol(StrEnum):
     UART = "UART"
@@ -25,7 +29,7 @@ def arg_parser():
     parser.add_argument(
         "--sys-clk-freq",
         type=str_to_int,
-        default=1e8,
+        default=125e6,
         help="System clock frequency",
     )
     parser.add_argument(
@@ -66,7 +70,6 @@ def arg_parser():
     parser.add_argument(
         "--build-dir",
         type=str,
-        default="./build-soc",
         help="Path to the build dir.",
     )
 
@@ -83,6 +86,12 @@ def arg_parser():
         action="store_true",
         default=False,
         help="Generate waveforms or not.",
+    )
+    parser.add_argument(
+        "--trace-start",
+        type=str_to_int,
+        default=-1,
+        help="Time (in ns) to begin tracing",
     )
 
     parser.add_argument(

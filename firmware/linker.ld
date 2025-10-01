@@ -44,6 +44,15 @@ SECTIONS
 		_edata = .;
 	} > sram AT > main_ram
 
+	/* TODO: revise if I need ALIGN at the end of each block */
+	.tpm_cmd_buffer :
+	{
+		. = ALIGN(8);
+		tpm_cmd_buf = .;
+		*(.tpm_cmd_buffer)
+		*(.tpm_cmd_buffer.*)
+	} > tpm_cmd_buffer
+
 	.dilithium_buffer :
 	{
 		. = ALIGN(8);
@@ -71,6 +80,14 @@ SECTIONS
 }
 
 PROVIDE(_fstack = ORIGIN(sram) + LENGTH(sram));
+PROVIDE(_fstack_size = 16K);
+
+ASSERT(SIZEOF(.data) + SIZEOF(.bss) + _fstack_size <= LENGTH(sram),
+       "SRAM too small for data+bss+stack reserve");
+
+PROVIDE (__heap_start = _end);
+PROVIDE (__heap_end = _fstack - _fstack_size);
+PROVIDE (__heap_size = __heap_end - __heap_start);
 
 PROVIDE(_fdata_rom = LOADADDR(.data));
 PROVIDE(_edata_rom = LOADADDR(.data) + SIZEOF(.data));

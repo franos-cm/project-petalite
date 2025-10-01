@@ -1,11 +1,12 @@
 ## TODO
 Remember to check all prints Ive added to Litex build, since some of them change stuff (like rom loading)
+https://github.com/trustedcomputinggroup/tpm
 
 -- Starting litex
 mkdir project-petalite
 cd project-petalite
-python3 -m venv venv
-source venv/bin/activate
+python3 -m venv .venv
+source .venv/bin/activate
 mkdir litex
 cd litex
 wget https://raw.githubusercontent.com/enjoy-digital/litex/master/litex_setup.py
@@ -32,8 +33,15 @@ sudo apt-get update
 sudo apt-get install locales
 sudo locale-gen en_US.UTF-8
 sudo update-locale
-source /tools/Xilinx/Vivado/2024.2/settings64.sh
+source /tools/Xilinx/2023.1/Vivado/2023.1/settings64.sh
+source /tools/Xilinx/2025.1.1/Vivado/settings64.sh
 vivado&
+
+-- If installing older version of Vivado (like 2023.1), also do:
+wget http://security.ubuntu.com/ubuntu/pool/universe/n/ncurses/libtinfo5_6.3-2ubuntu0.1_amd64.deb
+sudo apt install ./libtinfo5_6.3-2ubuntu0.1_amd64.deb
+wget http://security.ubuntu.com/ubuntu/pool/universe/n/ncurses/libncurses5_6.3-2ubuntu0.1_amd64.deb
+sudo apt install ./libtinfo5_6.3-2ubuntu0.1_amd64.deb
 
 
 -- GTKWave
@@ -78,17 +86,44 @@ puts $::env(LM_LICENSE_FILE)
 
 
 # Commands
+source /tools/Xilinx/2025.1.1/Vivado/settings64.sh
 export PATH="/tools/verilator/v5.036-48-g0dc93c1d5/bin:$PATH"
-./soc/petalite.py --sim --io-json=./soc/data/io_sim.json --build-dir=./builds/build-soc --trace --debug-bridge
-./soc/firmware/main.py  --build-path=./builds/build-soc --output-dir=build-firmware --firmware-name=firmware --mem=rom
-./soc/petalite.py --sim --io-json=./soc/data/io_sim.json --build-dir=./builds/build-soc --compile-gateware --firmware=build-firmware/firmware.bin --load --trace --debug-bridge
+
+This is a fresh install.
+INFO Could not detect the display scale (hDPI).
+       If you are using a high resolution monitor, you can set the insaller scale factor like this: 
+       export XINSTALLER_SCALE=2
+       setenv XINSTALLER_SCALE 2
+
+./build.sh
+./build.sh --force-all
+./soc/petalite.py --sim --io-json=soc/data/io_sim.json --build-dir=builds/soc --compile-gateware --firmware=builds/firmware.bin --load
+OPTIONALLY: --load --trace --debug-bridge
+python test/tpm.py
+
+
+./build.sh --board
+./build.sh --force-all --board
+./soc/petalite.py --build-dir=builds/soc --compile-gateware --firmware=builds/firmware.bin > synth_log_v4.txt
+OPTIONALLY: --load --trace --debug-bridge
+
+BOARD IS xc7vx690tffg1761-3
+
+# In tcp connection
+scp myfile.txt user@100.100.128.6:~/franos-cm/
+
+source .venv/bin/activate
+source /tools/Xilinx/Vivado/2023.1/settings64.sh
+
+python ~/franos-cm/project-petalite/test/tpm.py
+./program-board.sh ~/franos-cm/bitstreams/digilent_netfpga_sume.bit
+
+
+MORE COMMANDS:
 litex_server --udp --udp-ip=192.168.1.50
-litex_cli --csr-csv="./builds/build-soc/csr.csv" --regs
-gtkwave ./builds/build-soc/gateware/sim.fst
-
-litex_sim --cpu-type=rocket --cpu-variant=small --bus-data-width=64 --no-compile-gateware
-litex_sim --cpu-type=rocket --cpu-variant=small --bus-data-width=64 --rom-init=build/sim/software/bios/bios.bin
-
+litex_cli --csr-csv="./builds/soc/csr.csv" --regs
+gtkwave ./builds/soc/gateware/sim.fst
+./firmware/firmware.py show
 
 -- Adding swap mem to SoC:
 sudo swapoff -a
@@ -111,41 +146,48 @@ Also, install Xilinx drivers:
 cd <Vivado Install>/data/xicom/cable_drivers/lin64/install_script/install_drivers/
 sudo ./install_drivers
 
+cd builds/soc/gateware
+vivado&
+open_project digilent_netfpga_sume.xpr
+open_checkpoint ./digilent_netfpga_sume_route.dcp
+
+# Changes to Litex
+We might not need it, but we atm are changing the memory map for Rocket:
+    @property
+    def mem_map(self):
+        # Rocket reserves the first 256Mbytes for internal use, so we must change default mem_map.
+        return {
+            "clint"    : 0x0200_0000,
+            "plic"     : 0x0c00_0000,
+            "rom"      : 0x1000_0000,
+            "sram"     : 0x1100_0000,
+            "csr"      : 0x1200_0000,
+            "ethmac"   : 0x3000_0000,
+            "main_ram" : 0x8000_0000,
+        }
+
+    and
+    io_regions           = {0x1200_0000: 0x7000_0000}
+Later we should figure out if we actually need this or not
 
 
+# Debugging
+15h... got to 0xea... stopped
+running for 4h10min, currently in 0c-3
+4 cores seem to work really well, 8 is apparently almost exactly the same
 
--- Litex:
--- To simulate an arbitrary SoC, you do:
-if __name__ == "__main__":
-    soc = MySoC()
-    builder = Builder(soc, output_dir="build")
-    builder.build(sim_config={"tool": "litex_sim"})  # Build with simulation configuration
+0x8 in wolfssl in 25min
 
-    # Run the simulation; you can also pass options like trace generation.
-    run_simulation(soc, vcd_name="my_soc.vcd")
+We need to implement the shims in tpm_to_platform_interface.h AND ONLY THOSE (as far as I can tell)
+There are other _plat funcs, but they are for simulation purposes.
+Actually... some of the ones in platform_public_interface need to be CONCEPTUALLY implemented
+That is, we might need to have StartUp implemented as deasserting the SoC reset for example.
+But the function calls themselves dont seem all that necessary?
+They also seem to implement vars (like s_isCanceled) that need to be signals in the SoC itself... we might need some HAL here
+About this last topic (s_isCanceled and such), ask Copilot to summarize it for me
+Finally, we need to wrap the TPM command with a one (?) byte header, so we can also transmit stuff needed for the side-band (i.e. Cancel request, Locality, _TPM_Hash_Start)
+That is, if we still want to use UART, which seems like the safer bet. Otherwise, we would have to deal with
+how to share a bus between the TPM and the host in Litex (which might be possible, but still), and that would break our
+qemu simulation architecture... so best to stick to UART.
 
 
--- To simulate, you need:
-1. A module at the SoC capable of communication (Etherbone)
-2. A client to bridge the simulation with your interaction (litex_client)
-3. A python script with whatever you want to simulate
-
-Example:
-1. litex_sim --with-etherbone --csr-csv=csr.csv
-2. litex_server --udp --udp-ip=192.168.1.50
-3. Script below:
-from litex import RemoteClient
-wb = RemoteClient()
-wb.open()
-# get identifier
-fpga_id = ""
-print("identifier_mem: ")
-for i in range(256):
-    c = chr(wb.read(wb.bases.identifier_mem + 4*i) & 0xff)
-    fpga_id += c
-    if c == "\0":
-        break
-print("fpga_id: " + fpga_id)
-wb.close()
-
-Default port is 192.168.1.50.
