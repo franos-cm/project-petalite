@@ -1,13 +1,12 @@
 import time
 import socket
-import errno
-
-try:
-    import serial  # pyserial (optional when using TCP only)
-except Exception:  # ImportError or runtime issues
-    serial = None
 import threading
 import queue
+
+try:
+    import serial  # (optional when using TCP only)
+except Exception:
+    serial = None
 
 
 from utils import (
@@ -74,10 +73,15 @@ class UARTConnection:
         serial_port: str | None = "/dev/ttyUSB1",
         baudrate: int = 115200,
         serial_timeout: float = 0.1,
+        name: str = None,
         debug: bool = True,
     ):
+        self.name = name
         self.debug = debug
         self.running = False
+        # NEW: remember mode and configure per-byte read logging for serial
+        self.mode = mode
+        self.log_read_each_byte = mode == "serial"
 
         # NEW: transport abstraction with TCP or Serial
         self.transport = None
@@ -108,11 +112,16 @@ class UARTConnection:
         self.read_thread.start()
         self.write_thread.start()
 
-        print("Read/Write threads started")
+        print(f"{self._id()} Read/Write threads started")
+
+    def _id(self):
+        return f"[{self.name}]" if self.name else ""
 
     def _open_tcp(self, host, port, max_wait):
         """Retry TCP connection to simulation until timeout (original style)"""
-        print(f"Connecting to {host}:{port}... (will wait up to {max_wait}s)")
+        print(
+            f"{self._id()} Connecting to {host}:{port}... (will wait up to {max_wait}s)"
+        )
 
         try_count = 0
         start_time = time.time()
@@ -123,7 +132,9 @@ class UARTConnection:
                 sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
                 sock.connect((host, port))
                 elapsed = time.time() - start_time
-                print(f"✅ Connected to simulation after {elapsed:.2f} seconds!")
+                print(
+                    f"✅{self._id()} Connected to simulation after {elapsed:.2f} seconds!"
+                )
                 # Preserve original attribute name for parity
                 self.sock = sock
                 self.transport = _SocketTransport(sock)
@@ -136,13 +147,13 @@ class UARTConnection:
                     pass
                 elapsed = time.time() - start_time
                 print(
-                    f"[{elapsed:.2f}s] Simulation not ready yet (attempt {try_count}). Retrying..."
+                    f"{self._id()}[{elapsed:.2f}s] Simulation not ready yet (attempt {try_count}). Retrying..."
                 )
                 try_count += 1
                 time.sleep(0.1)
 
         raise TimeoutError(
-            f"❌ Could not connect to simulation at {host}:{port} after {max_wait} seconds"
+            f"❌{self._id()} Could not connect to simulation at {host}:{port} after {max_wait} seconds"
         )
 
     # NEW: Serial opener
@@ -162,7 +173,7 @@ class UARTConnection:
         # Small delay to allow device reset (common on USB CDC)
         time.sleep(0.1)
         self.transport = _SerialTransport(ser)
-        print("✅ Serial port opened")
+        print(f"✅{self._id()} Serial port opened")
 
     def _read_worker(self):
         """Background thread that continuously reads from transport"""
@@ -173,13 +184,18 @@ class UARTConnection:
                 if data:
                     self.received_data.put(("data", data, time.time()))
                     if self.debug:
-                        print(f"[READ] {data.hex()}")
+                        # Print each byte separately when enabled (serial)
+                        if getattr(self, "log_read_each_byte", False):
+                            for b in data:
+                                print(f"{self._id()}[READ] {b:02x}")
+                        else:
+                            print(f"{self._id()}[READ] {data.hex()}")
             except socket.timeout:
                 # Non-fatal: simply try again
                 continue
             except Exception as e:
                 if self.running:
-                    print(f"[READ ERROR] {e}")
+                    print(f"{self._id()}[READ ERROR] {e}")
                     self.received_data.put(("error", str(e), time.time()))
                 break
 
@@ -191,11 +207,11 @@ class UARTConnection:
                 if command:
                     if self.debug:
                         if isinstance(command, bytes):
-                            print(f"[WRITE] 0x{command.hex().upper()}")
+                            print(f"{self._id()}[WRITE] 0x{command.hex().upper()}")
                         elif isinstance(command, int):
-                            print(f"[WRITE] 0x{command:X}")
+                            print(f"{self._id()}[WRITE] 0x{command:X}")
                         else:
-                            print(f"[WRITE] {repr(command)}")
+                            print(f"{self._id()}[WRITE] {repr(command)}")
 
                     if isinstance(command, str):
                         command = command.encode()
@@ -208,7 +224,7 @@ class UARTConnection:
                 continue
             except Exception as e:
                 if self.running:
-                    print(f"[WRITE ERROR] {e}")
+                    print(f"{self._id()}[WRITE ERROR] {e}")
 
     def send_bytes(self, data):
         """Send multiple bytes"""
@@ -249,13 +265,15 @@ class UARTConnection:
                             return True
 
                 elif msg_type == "error":
-                    print(f"[ERROR] {data}")
+                    print(f"{self._id()}[ERROR] {data}")
                     return False
 
             except queue.Empty:
                 continue
 
-        print(f"[TIMEOUT] No {signal_name.upper()} received in {timeout:.3f} seconds")
+        print(
+            f"{self._id()}[TIMEOUT] No {signal_name.upper()} received in {timeout:.3f} seconds"
+        )
         return False
 
     def wait_for_bytes(self, num_bytes, timeout=5):
@@ -307,15 +325,15 @@ class UARTConnection:
         return response_header
 
     def send_ack(self):
-        print(f"\t[ACK] Sending ACK...")
+        print(f"\t{self._id()}[ACK] Sending ACK...")
         self.send_bytes(DILITHIUM_ACK_BYTE)
 
     def send_sync(self):
-        print(f"\t[SYNC] Sending SYNC...")
+        print(f"\t{self._id()}[SYNC] Sending SYNC...")
         self.send_bytes(DILITHIUM_SYNC_BYTE)
 
     def send_start(self):
-        print(f"\t[START] Sending START...")
+        print(f"\t{self._id()}[START] Sending START...")
         self.send_bytes(DILITHIUM_START_BYTE)
 
     def send_in_chunks(
@@ -331,11 +349,12 @@ class UARTConnection:
             data_chunk = data[start:end]
 
             print(
-                f"\tSending {data_name}({chunk_num+1}/{total_chunks}), ({len(data_chunk)} bytes): {data_chunk[:8].hex()}..."
+                f"\t{self._id()} Sending {data_name}({chunk_num+1}/{total_chunks}),"
+                f"({len(data_chunk)} bytes): {data_chunk[:8].hex()}..."
             )
             self.send_bytes(data_chunk)
             if not self.wait_for_ack():
-                print(f"Failed to get {data_name} ({chunk_num+1}) ACK")
+                print(f"{self._id()} Failed to get {data_name} ({chunk_num+1}) ACK")
                 return False
 
     def receive_in_chunks(
@@ -361,7 +380,7 @@ class UARTConnection:
 
         if data_name:
             print(
-                f"\tReceiving {data_name} ({total_bytes} bytes) in {total_chunks} chunks..."
+                f"\t{self._id()} Receiving {data_name} ({total_bytes} bytes) in {total_chunks} chunks..."
             )
 
         for chunk_num in range(total_chunks):
@@ -369,7 +388,7 @@ class UARTConnection:
 
             if self.debug:
                 print(
-                    f"\tReceiving {data_name} chunk ({chunk_num + 1}/{total_chunks}), waiting for {bytes_to_receive} bytes..."
+                    f"\t{self._id()} Receiving {data_name} chunk ({chunk_num + 1}/{total_chunks}), waiting for {bytes_to_receive} bytes..."
                 )
 
             # Wait for the next chunk of data
@@ -379,7 +398,7 @@ class UARTConnection:
 
             if not data_chunk or len(data_chunk) < bytes_to_receive:
                 print(
-                    f"❌ Failed to receive {data_name} chunk ({chunk_num + 1}). Timed out."
+                    f"❌{self._id()} Failed to receive {data_name} chunk ({chunk_num + 1}). Timed out."
                 )
                 return None
 
@@ -388,17 +407,17 @@ class UARTConnection:
             # Acknowledge receipt of the chunk
             self.send_ack()
             if self.debug:
-                print(f"\t✅ ACK'd chunk {chunk_num + 1}/{total_chunks}")
+                print(f"\t✅{self._id()} ACK'd chunk {chunk_num + 1}/{total_chunks}")
 
         if len(full_data) == total_bytes:
             if data_name:
                 print(
-                    f"✅ Successfully received all {total_bytes} bytes of {data_name}."
+                    f"✅{self._id()} Successfully received all {total_bytes} bytes of {data_name}."
                 )
             return full_data
         else:
             print(
-                f"❌ Error: Expected {total_bytes} bytes, but received {len(full_data)}."
+                f"❌{self._id()} Error: Expected {total_bytes} bytes, but received {len(full_data)}."
             )
             return None
 
@@ -410,13 +429,13 @@ class UARTConnection:
                 item = self.received_data.get_nowait()
                 msg_type, data, timestamp = item
                 if msg_type == "data":
-                    print(f"Received: {data.hex()}")
+                    print(f"{self._id()} Received: {data.hex()}")
         except queue.Empty:
-            print("No more data")
+            print(f"{self._id()} No more data")
 
     def close(self):
         """Clean shutdown"""
-        print("Shutting down UART connection...")
+        print(f" {self._id()} Shutting down UART connection...")
         self.running = False
         self.read_thread.join(timeout=1)
         self.write_thread.join(timeout=1)
@@ -424,4 +443,4 @@ class UARTConnection:
             self.transport.close()
         except Exception:
             pass
-        print("UART connection closed")
+        print(f"{self._id()} UART connection closed")
