@@ -1,17 +1,10 @@
 #include "transport.h"
 #include "platform.h"
 #include "run_command.h"
-#include "Tpm.h"
 
 int main(void)
 {
     transport_irq_init();
-    debug_breakpoint(0x00);
-    debug_breakpoint(0x01);
-    debug_breakpoint(0xFD);
-    debug_breakpoint(0xFE);
-    debug_breakpoint(0x01);
-    debug_breakpoint(0x00);
     platform_cold_boot();
 
     _debug_transport_write_ready();
@@ -30,10 +23,7 @@ int main(void)
 
                 // Optionally pause RX/IRQs so the ingress path can't stomp the buffer
                 // receiver_pause();
-                debug_breakpoint(0xFF);
                 _plat__RunCommand(cmd_len, tpm_cmd_buf, &resp_len, &resp_ptr);
-                debug_breakpoint(0xFD);
-                debug_breakpoint(0xFE);
 
                 _debug_transport_write_ready();
                 transport_write_rsp(resp_ptr, resp_len);

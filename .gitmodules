@@ -4,7 +4,7 @@
 [submodule "firmware/ms-tpm-20-ref"]
 	path = firmware/ms-tpm-20-ref
 	url = https://github.com/franos-cm/ms-tpm-20-ref.git
-	branch = fpga-test
+	branch = baremetal-build
 [submodule "dilithium-rtl"]
 	path = dilithium-rtl
 	url = https://github.com/franos-cm/dilithium-rtl.git

@@ -44,20 +44,20 @@ LIB_EXPORT NORETURN void _plat__Fail(void)
 {
 
     // Emit marker before assertion so host can parse
-    debug_breakpoint(0xF2);
+    debug_breakpoint(0xFF);
 #ifdef s_failLine
     debug_breakpoint((UINT8)(s_failLine >> 8));
     debug_breakpoint((UINT8)(s_failLine & 0xFF));
 #else
     debug_breakpoint(0x00);
-    debug_breakpoint(0x01);
+    debug_breakpoint(0xFF);
 #endif
 #ifdef s_failCode
     debug_breakpoint((UINT8)(s_failCode >> 8));
     debug_breakpoint((UINT8)(s_failCode & 0xFF));
 #else
     debug_breakpoint(0x00);
-    debug_breakpoint(0x01);
+    debug_breakpoint(0xFF);
 #endif
 
 #if ALLOW_FORCE_FAILURE_MODE
