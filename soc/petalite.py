@@ -316,17 +316,25 @@ def main():
             )
 
         builder.build(
-            run=args.load,
+            # Basic args
             sim_config=sim_config,
-            interactive=False,
+            run=args.load,
+            # Tracing
+            trace=args.trace,
+            trace_fst=args.trace,
+            trace_start=args.trace_start if args.trace else 0,
             pre_run_callback=(
                 (lambda vns: generate_gtkw_savefile(builder, vns, True))
                 if args.trace
                 else None
             ),
-            trace=args.trace,
-            trace_fst=args.trace,
-            trace_start=18_800_000_000 if args.trace else 0,  # (in ns)
+            # Verilator optimizations
+            threads=8,  # runtime threads for Verilator
+            jobs=8,  # compile parallelism
+            opt_level="O3",
+            interactive=True,
+            coverage=False,
+            video=False,
         )
 
     else:

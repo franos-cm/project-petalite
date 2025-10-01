@@ -87,6 +87,12 @@ def arg_parser():
         default=False,
         help="Generate waveforms or not.",
     )
+    parser.add_argument(
+        "--trace-start",
+        type=str_to_int,
+        default=-1,
+        help="Time (in ns) to begin tracing",
+    )
 
     parser.add_argument(
         "--debug-bridge",

@@ -174,6 +174,9 @@ Later we should figure out if we actually need this or not
 # Debugging
 15h... got to 0xea... stopped
 running for 4h10min, currently in 0c-3
+4 cores seem to work really well, 8 is apparently almost exactly the same
+
+0x8 in wolfssl in 25min
 
 We need to implement the shims in tpm_to_platform_interface.h AND ONLY THOSE (as far as I can tell)
 There are other _plat funcs, but they are for simulation purposes.
