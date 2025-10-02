@@ -114,6 +114,11 @@ class UARTConnection:
 
         print(f"{self._id()} Read/Write threads started")
 
+        # Internal pushback buffer for preserving byte order when a control byte
+        # (e.g., READY/ACK) arrives in the same read as subsequent payload bytes.
+        # We always consume from this buffer before the queue to avoid reordering.
+        self._pushback = bytearray()
+
     def _id(self):
         return f"[{self.name}]" if self.name else ""
 
@@ -245,22 +250,42 @@ class UARTConnection:
 
         return received
 
+    def _take_from_pushback(self, n: int) -> bytes:
+        """Remove and return up to n bytes from the pushback buffer."""
+        if not self._pushback:
+            return b""
+        take = min(n, len(self._pushback))
+        chunk = bytes(self._pushback[:take])
+        del self._pushback[:take]
+        return chunk
+
+    def _next_data_chunk(self, timeout=0.1):
+        """Yield next data/error item, preferring pushback first.
+
+        Returns a tuple (msg_type, data, timestamp) consistent with queue items.
+        If pushback has data, returns it as a single 'data' chunk.
+        """
+        if self._pushback:
+            data = bytes(self._pushback)
+            self._pushback.clear()
+            return ("data", data, time.time())
+        return self.received_data.get(timeout=timeout)
+
     def _wait_for_byte(self, expected_byte, signal_name: str = "", timeout=5):
         """Wait for a specific byte value"""
         start_time = time.perf_counter()
 
         while time.perf_counter() - start_time < timeout:
             try:
-                item = self.received_data.get(timeout=0.1)
-                msg_type, data, timestamp = item
+                msg_type, data, timestamp = self._next_data_chunk(timeout=0.1)
 
                 if msg_type == "data" and data:
                     for idx, byte in enumerate(data):
                         if byte == expected_byte:
-                            # Push back any remaining bytes after the matched one
+                            # Stash any remaining bytes locally to preserve ordering
                             if idx + 1 < len(data):
                                 remaining = data[idx + 1 :]
-                                self.received_data.put(("data", remaining, time.time()))
+                                self._pushback.extend(remaining)
                             if signal_name:
                                 elapsed = time.perf_counter() - start_time
                                 print(
@@ -283,28 +308,38 @@ class UARTConnection:
     def wait_for_bytes(self, num_bytes, timeout=5):
         """Wait for specific number of bytes"""
         start_time = time.perf_counter()
-        buffer = b""
+        buffer = bytearray()
 
         while time.perf_counter() - start_time < timeout:
             try:
-                item = self.received_data.get(timeout=0.1)
-                msg_type, data, timestamp = item
+                # First, consume from pushback if any
+                if self._pushback and len(buffer) < num_bytes:
+                    need = num_bytes - len(buffer)
+                    buffer.extend(self._take_from_pushback(need))
+                    if len(buffer) >= num_bytes:
+                        return bytes(buffer[:num_bytes])
+
+                msg_type, data, timestamp = self._next_data_chunk(timeout=0.1)
 
                 if msg_type == "data":
-                    buffer += data
+                    need = num_bytes - len(buffer)
+                    if need > 0:
+                        take = data[:need]
+                        buffer.extend(take)
+                        # Anything beyond what we needed goes into pushback
+                        if len(data) > len(take):
+                            self._pushback.extend(data[len(take) :])
+                    else:
+                        # Already have enough, stash all data to pushback
+                        self._pushback.extend(data)
 
                     if len(buffer) >= num_bytes:
-                        result = buffer[:num_bytes]
-                        # Put remaining bytes back (if any)
-                        if len(buffer) > num_bytes:
-                            remaining = buffer[num_bytes:]
-                            self.received_data.put(("data", remaining, time.time()))
-                        return result
+                        return bytes(buffer[:num_bytes])
 
             except queue.Empty:
                 continue
 
-        return buffer if buffer else None
+        return bytes(buffer) if buffer else None
 
     def wait_for_ack(self, timeout=120):
         return self._wait_for_byte(
