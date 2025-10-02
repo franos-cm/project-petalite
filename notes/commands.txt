@@ -95,15 +95,15 @@ INFO Could not detect the display scale (hDPI).
        export XINSTALLER_SCALE=2
        setenv XINSTALLER_SCALE 2
 
-./build.sh
-./build.sh --force-all
+./scripts/build.sh
+./scripts/build.sh --force-all
 ./soc/petalite.py --sim --io-json=soc/data/io_sim.json --build-dir=builds/soc --compile-gateware --firmware=builds/firmware.bin --load
 OPTIONALLY: --load --trace --debug-bridge
 python test/tpm.py
 
 
-./build.sh --board
-./build.sh --force-all --board
+./scripts/build.sh --board
+./scripts/build.sh --force-all --board
 ./soc/petalite.py --build-dir=builds/soc --compile-gateware --firmware=builds/firmware.bin > synth-log-debug.txt
 OPTIONALLY: --load --trace --debug-bridge
 
@@ -118,7 +118,7 @@ source .venv/bin/activate
 source /tools/Xilinx/Vivado/2023.1/settings64.sh
 
 python ~/franos-cm/project-petalite/test/tpm.py
-./program-board.sh ~/franos-cm/bitstreams/digilent-netfpga-sume-v1.bit
+./scripts/program-board.sh ~/franos-cm/bitstreams/digilent-netfpga-sume-v1.bit
 
 
 MORE COMMANDS:

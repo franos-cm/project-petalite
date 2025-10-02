@@ -1,5 +1,3 @@
-# Random notes
-
 - We had to change this part of Litex a bit so we could map the crypto buffer in IO space
 - Which is not ideal... but when we put it out of that space, the firmware could not access those positions
 

@@ -1,9 +1,9 @@
 #!/usr/bin/env bash
-# program_fpga.sh — program a Xilinx device via Vivado CLI
+# program-board.sh — program a Xilinx device via Vivado CLI
 # Usage:
-#   ./program_fpga.sh /path/to/top.bit           # uses device index 0 by default
-#   ./program_fpga.sh /path/to/top.bit 1         # choose another device on the JTAG chain
-#   ./program_fpga.sh /path/to/top.bit 0 localhost:3121  # custom hw_server URL
+#   ./scripts/program-board.sh /path/to/top.bit           # uses device index 0 by default
+#   ./scripts/program-board.sh /path/to/top.bit 1         # choose another device on the JTAG chain
+#   ./scripts/program-board.sh /path/to/top.bit 0 localhost:3121  # custom hw_server URL
 
 set -euo pipefail
 
@@ -79,6 +79,6 @@ info_msg "DONE."
 exit
 TCL
 
-# Export vars for Tcl
+# Export vars for Tcl and run vivado
 BIT="$BIT" DEV_INDEX="$DEV_INDEX" HW_URL="$HW_URL" vivado -mode batch -source "$TCL"
 rm -f "$TCL"

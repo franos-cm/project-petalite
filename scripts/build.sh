@@ -25,9 +25,9 @@ fi
 
 usage() {
   cat <<'USAGE'
-Usage: ./build.sh [options]
+Usage: ./scripts/build.sh [options]
 
-./build.sh --force-all
+./scripts/build.sh --force-all
 
 Options:
   --force-wolfssl-build Force (re)build wolfSSL even if existing library present
@@ -36,8 +36,10 @@ Options:
   --board               Build SoC for a physical board (no --sim). Default is simulation.
   -h, --help            Show this help
 
+Assumptions:
+  Python environment is already active (recommended: source ./.venv/bin/activate)
+
 Environment overrides:
-  VENV_DIR=<path>       Virtualenv directory (default: ./venv)
   FORCE_SOC_BUILD=1     Force full SoC rebuild (deletes builds/soc)
   FORCE_SOC=1           (deprecated) Same as FORCE_SOC_BUILD=1
   FORCE_WOLFSSL_BUILD=1 Same as --force-wolfssl-build
@@ -63,10 +65,11 @@ if [ "$FORCE_ALL" = "1" ]; then
   FORCE_SOC_BUILD=1
 fi
 
-REPO_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+# Compute repo root as the parent of this script's directory
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+REPO_DIR="$(cd "$SCRIPT_DIR/.." && pwd)"
 cd "$REPO_DIR"
 
-VENV_DIR="${VENV_DIR:-$REPO_DIR/venv}"
 SOC_BUILD_DIR="$REPO_DIR/builds/soc"
 FIRMWARE_HELPER="$REPO_DIR/firmware/firmware.py"
 SOC_SCRIPT="$REPO_DIR/soc/petalite.py"
@@ -90,26 +93,16 @@ elapsed() { # usage: elapsed <start_epoch> <label>
 
 time_start=$(date +%s)
 
-# --------- 1. Activate venv (only if not already the active one) ---------
-step "Activating Python virtual environment (if needed)"
-if [ -d "$VENV_DIR" ]; then
-  if [ -n "${VIRTUAL_ENV:-}" ]; then
-    if [ "$VIRTUAL_ENV" = "$VENV_DIR" ]; then
-      ok "Target venv already active ($VIRTUAL_ENV)"
-    else
-      warn "Different virtual environment currently active ($VIRTUAL_ENV); switching to $VENV_DIR"
-      # shellcheck source=/dev/null
-      source "$VENV_DIR/bin/activate"
-      ok "Switched to venv at $VENV_DIR (python: $(command -v python))"
-    fi
-  else
-    # shellcheck source=/dev/null
-    source "$VENV_DIR/bin/activate"
-    ok "Activated venv at $VENV_DIR (python: $(command -v python))"
-  fi
+# --------- 1. Environment check ---------
+step "Checking Python availability (assumes environment already active)"
+if command -v python >/dev/null 2>&1; then
+  PYTHON=python
+elif command -v python3 >/dev/null 2>&1; then
+  PYTHON=python3
 else
-  info "No venv at $VENV_DIR (continuing with system python: $(command -v python || echo 'none'))"
+  fail "No python executable found in PATH. Activate your environment (e.g., 'source .venv/bin/activate') and retry."; exit 1
 fi
+ok "Using $("$PYTHON" -V 2>&1) at $(command -v "$PYTHON")"
 
 # Sanity check scripts exist
 [ -x "$FIRMWARE_HELPER" ] || chmod +x "$FIRMWARE_HELPER" 2>/dev/null || true
@@ -126,11 +119,11 @@ step "Pre-build cleanup phase"
 start=$(date +%s)
 if [ "$FORCE_WOLFSSL_BUILD" = "1" ]; then
   info "Forcing wolfSSL rebuild: performing full clean (firmware + wolfSSL artifacts)"
-  python "$FIRMWARE_HELPER" clean || { fail "Clean failed"; exit 1; }
+  "$PYTHON" "$FIRMWARE_HELPER" clean || { fail "Clean failed"; exit 1; }
 else
   info "Skipping full clean (wolfSSL cached). Cleaning TPM objects and firmware artifacts only"
-  python "$FIRMWARE_HELPER" tpm-clean || true
-  python "$FIRMWARE_HELPER" firmware-clean || true
+  "$PYTHON" "$FIRMWARE_HELPER" tpm-clean || true
+  "$PYTHON" "$FIRMWARE_HELPER" firmware-clean || true
 fi
 ok "Cleanup phase done $(elapsed $start 'time')"
 
@@ -149,10 +142,10 @@ if [ ! -d "$SOC_BUILD_DIR" ] || [ "${FORCE_SOC_BUILD:-0}" = "1" ]; then
   start=$(date +%s)
   set -x
   if [ "$BOARD_BUILD" = "1" ]; then
-    python "$SOC_SCRIPT" \
+    "$PYTHON" "$SOC_SCRIPT" \
       --build-dir=builds/soc
   else
-    python "$SOC_SCRIPT" \
+    "$PYTHON" "$SOC_SCRIPT" \
       --sim \
       --io-json=soc/data/io_sim.json \
       --build-dir=builds/soc
@@ -169,8 +162,8 @@ WOLFSSL_LIB_CHECK="$SOC_BUILD_DIR/software/wolfssl/lib/libwolfssl.a"
 if [ "$FORCE_WOLFSSL_BUILD" = "1" ]; then
   info "--force-wolfssl-build: rebuilding wolfSSL"
   start=$(date +%s)
-  python "$FIRMWARE_HELPER" wolfssl-clean || true
-  python "$FIRMWARE_HELPER" wolfssl-build
+  "$PYTHON" "$FIRMWARE_HELPER" wolfssl-clean || true
+  "$PYTHON" "$FIRMWARE_HELPER" wolfssl-build
   ok "wolfSSL force build done $(elapsed $start 'time')"
 else
   if [ -f "$WOLFSSL_LIB_CHECK" ]; then
@@ -178,7 +171,7 @@ else
   else
     info "wolfSSL library missing; building"
     start=$(date +%s)
-    python "$FIRMWARE_HELPER" wolfssl-build
+  "$PYTHON" "$FIRMWARE_HELPER" wolfssl-build
     ok "wolfSSL build done $(elapsed $start 'time')"
   fi
 fi
@@ -186,13 +179,13 @@ fi
 # --------- 5. TPM static library build ---------
 step "Building TPM + platform static library"
 start=$(date +%s)
-python "$FIRMWARE_HELPER" tpm-build
+"$PYTHON" "$FIRMWARE_HELPER" tpm-build
 ok "TPM build done $(elapsed $start 'time')"
 
 # --------- 6. Firmware final build (with .fbi) ---------
 step "Building firmware image (+ .fbi)"
 start=$(date +%s)
-python "$FIRMWARE_HELPER" build --fbi
+"$PYTHON" "$FIRMWARE_HELPER" build --fbi
 ok "Firmware build complete $(elapsed $start 'time')"
 
 echo
