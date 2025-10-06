@@ -191,3 +191,7 @@ So next steps:
     1. Run tpm with wolfssl on host machine
     2. Run SoC on board, time it.
     3. Figure out from there.
+
+
+Add a second uart just so we can send control signals?
+or drive one uart from two different places? what clock domain should it be in?
