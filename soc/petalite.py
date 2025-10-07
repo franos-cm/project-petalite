@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
 from migen import Signal, ClockDomainsRenamer
+from migen.genlib.cdc import PulseSynchronizer, MultiReg
 from litex.soc.cores.dma import WishboneDMAReader, WishboneDMAWriter
 from litex.soc.integration.builder import Builder
 from litex.soc.integration.soc_core import SoCCore
@@ -9,7 +10,7 @@ from litex.soc.interconnect.csr import CSR
 from litex.build.generic_platform import GenericPlatform
 from litex_boards.platforms import digilent_netfpga_sume
 
-from cores import Dilithium, add_rtl_sources
+from cores import Dilithium, PowerBridge, PowerController, add_rtl_sources
 from platforms import PetaliteSimPlatform
 from helpers import CommProtocol, arg_parser, generate_gtkw_savefile, KBYTE
 
@@ -106,46 +107,46 @@ class PetaliteCore(SoCCore):
             )
 
     def setup_clk(self: SoCCore):
+        # Add a CRG with two clock domains, a sys one and another that is always on
+        # The two domains then need some extra structure to communicate properly
         if self.is_simulated:
-            from migen.genlib.io import CRG
+            from cores import PetaliteSimCRG
 
-            self.crg = CRG(self.platform_instance.request("sys_clk"))
+            self.crg = PetaliteSimCRG(self.platform_instance.request("sys_clk"))
         else:
-            from cores import PetaliteCRG, PowerBridge
-            from migen.genlib.cdc import MultiReg, PulseSynchronizer
+            from cores import PetaliteCRG
 
-            # Add a CRG with two clock domains, a sys one and another that is always on
-            # The two domains then need some extra structure to communicate properly
             self.crg = PetaliteCRG(self.platform, self.sys_clk_freq)
 
-            # 1. Make it possible that the CPU can put itself to sleep
-            self.submodules._sleep_req = CSR()
-            self.add_csr("_sleep_req")
-            # Cross a pulse between clock domains
-            sleep_ps = PulseSynchronizer("sys", "sys_always_on")
-            self.submodules += sleep_ps
-            self.comb += sleep_ps.i.eq(self._sleep_req.re)
+        # 1. Make it possible that the CPU can put itself to sleep
+        self.submodules.power_controller = PowerController()
+        self.add_csr("power_controller")
+        # Cross a pulse between clock domains
+        sleep_ps = PulseSynchronizer("sys", "sys_always_on")
+        self.submodules += sleep_ps
+        self.comb += sleep_ps.i.eq(self.power_controller.req.re)
 
-            # 2. Have a signal that the host can assert to request sleep
-            host_req_sleep = Signal()
-            self.comb += host_req_sleep.eq(0)  # Temporarily disable it
-            # For now, lets have a board pin that does that
-            tpm_pdn_pad = self.platform.request("tpm_pdn")
-            tpm_pdn = Signal()
-            self.specials += MultiReg(tpm_pdn_pad, tpm_pdn, "sys_always_on")
-            self.comb += host_req_sleep.eq(tpm_pdn)
+        # # 2. Have a signal that the host can assert to request sleep
+        host_req_sleep = Signal()
+        # # Temporarily disable it
+        self.comb += host_req_sleep.eq(0)
+        # Or alternatively, lets have a board pin that does that
+        # tpm_pdn_pad = self.platform.request("tpm_pdn")
+        # tpm_pdn = Signal()
+        # self.specials += MultiReg(tpm_pdn_pad, tpm_pdn, "sys_always_on")
+        # self.comb += host_req_sleep.eq(tpm_pdn)
 
-            # 3. Have a small FSM that keeps track of the current state on the always-on domain
-            self.submodules.power_bridge = ClockDomainsRenamer(
-                {"sys": "sys_always_on"}
-            )(PowerBridge())
-            self.comb += [
-                self.power_bridge.set_sleep_pulse.eq(sleep_ps.o),
-                self.power_bridge.host_req_sleep.eq(host_req_sleep),
-            ]
+        # 3. Have a small FSM that keeps track of the current state on the always-on domain
+        self.submodules.power_bridge = ClockDomainsRenamer({"sys": "sys_always_on"})(
+            PowerBridge()
+        )
+        self.comb += [
+            self.power_bridge.set_sleep_pulse.eq(sleep_ps.o),
+            self.power_bridge.host_req_sleep.eq(host_req_sleep),
+        ]
 
-            # 4. Gate the sys domain using the FSM
-            self.comb += self.crg.power_down.eq(self.power_bridge.power_down)
+        # 4. Gate the sys domain using the FSM
+        self.comb += self.crg.power_down.eq(self.power_bridge.power_down)
 
     def setup_mem_map(self: SoCCore):
         # Simple IO memory bump-allocator
@@ -294,7 +295,7 @@ def main():
             # Tracing
             trace=args.trace,
             trace_fst=args.trace,
-            trace_start=args.trace_start if args.trace else 0,
+            trace_start=args.trace_start if args.trace else -1,
             pre_run_callback=(
                 (lambda vns: generate_gtkw_savefile(builder, vns, True))
                 if args.trace

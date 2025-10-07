@@ -1,7 +1,8 @@
 from migen import Signal, ClockDomain, If
+from migen.genlib.resetsync import AsyncResetSynchronizer
 from litex.gen import LiteXModule
 from litex.soc.cores.clock import S7PLL
-from migen.genlib.resetsync import AsyncResetSynchronizer
+from litex.soc.interconnect.csr import CSRStorage, AutoCSR
 
 
 class PetaliteCRG(LiteXModule):
@@ -45,6 +46,38 @@ class PetaliteCRG(LiteXModule):
         platform.add_false_path_constraints(self.cd_sys.clk, pll.clkin)
 
 
+class PetaliteSimCRG(LiteXModule):
+    """
+    Simulation CRG identical to hardware behavior but without PLL:
+      - cd_por          : reset-less POR generator
+      - cd_sys_always_on: driven by simulator clock, reset by POR
+      - cd_sys          : same clock, reset by POR OR power_down
+    """
+
+    def __init__(self, clk_in):
+        self.cd_sys_always_on = ClockDomain()
+        self.cd_sys = ClockDomain()
+        self.cd_por = ClockDomain(reset_less=True)
+        self.power_down = Signal(reset=0)
+
+        # Clocks
+        self.comb += [
+            self.cd_sys_always_on.clk.eq(clk_in),
+            self.cd_sys.clk.eq(clk_in),
+            self.cd_por.clk.eq(clk_in),
+        ]
+
+        # POR (matches original migen CRG behavior)
+        int_rst = Signal(reset=1)
+        self.sync.por += int_rst.eq(0)
+
+        # Asynchronous reset like on hardware CRG
+        self.specials += [
+            AsyncResetSynchronizer(self.cd_sys_always_on, int_rst),
+            AsyncResetSynchronizer(self.cd_sys, int_rst | self.power_down),
+        ]
+
+
 class PowerBridge(LiteXModule):
     """
     Policy B latch in AO:
@@ -66,3 +99,15 @@ class PowerBridge(LiteXModule):
                 If(~self.host_req_sleep, self.power_down.eq(0))  # host releases -> wake
             )
         ]
+
+
+class PowerController(LiteXModule, AutoCSR):
+    """
+    For now this is a verbose way of getting a single CSR,
+    but it could be useful in the future, if we add more signals.
+    Moreover, just declaring this signal and CSR in the SoC
+    initializer did not seem to work, so this is probably good practice.
+    """
+
+    def __init__(self):
+        self.req = CSRStorage(size=1)

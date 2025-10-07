@@ -90,7 +90,7 @@ def arg_parser():
     parser.add_argument(
         "--trace-start",
         type=str_to_int,
-        default=-1,
+        default=0,
         help="Time (in ns) to begin tracing",
     )
 
