@@ -105,7 +105,7 @@ class PetaliteCore(SoCCore):
                 l2_cache_size=8192,
             )
 
-    def setup_buffer_allocator(self: SoCCore):
+    def setup_buffer_allocator(self):
         # Simple IO memory bump-allocator
         # TODO: revise this IO start address, because it probably
         #       assumes changing the default Rocket memory map
@@ -145,7 +145,7 @@ class PetaliteCore(SoCCore):
         self._io_cur = end
         return origin
 
-    def add_crg(self: SoCCore):
+    def add_crg(self):
         # Add a CRG with two clock domains, a sys one and another that is always on
         # The two domains then need some extra structure to communicate properly
         if self.is_simulated:
@@ -187,14 +187,14 @@ class PetaliteCore(SoCCore):
         # 4. Gate the sys domain using the FSM
         self.comb += self.crg.power_down.eq(self.power_bridge.power_down)
 
-    def add_id(self: SoCCore):
+    def add_id(self):
         if not self.is_simulated:
             from litex.soc.cores.dna import DNA
 
             self.submodules.dna = DNA()
             self.add_csr("dna")
 
-    def add_io(self: SoCCore):
+    def add_io(self):
         if self.comm_protocol == CommProtocol.UART:
             self.add_uart(uart_name="sim" if self.is_simulated else "serial")
             # Add io buffers for receiving commands
@@ -207,10 +207,20 @@ class PetaliteCore(SoCCore):
         else:
             raise RuntimeError()
 
-    def add_trng(self: SoCCore):
-        pass
+    def add_trng(self):
+        if self.is_simulated:
+            from cores import SimTRNG
 
-    def add_dilithium(self: SoCCore):
+            trng = SimTRNG()
+        else:
+            from cores import RingOscillatorTRNG
+
+            trng = RingOscillatorTRNG(platform=self.platform_instance)
+
+        self.submodules.trng = trng
+        self.add_csr("trng")
+
+    def add_dilithium(self):
         # Add bus masters
         wb_dilithium_reader = wishbone.Interface(data_width=64)
         wb_dilithium_writer = wishbone.Interface(data_width=64)
