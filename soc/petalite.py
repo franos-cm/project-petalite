@@ -1,22 +1,22 @@
-#!/usr/bin/env python3
 from migen import Signal, ClockDomainsRenamer
 from migen.genlib.cdc import PulseSynchronizer, MultiReg
 from litex.soc.cores.dma import WishboneDMAReader, WishboneDMAWriter
-from litex.soc.integration.builder import Builder
 from litex.soc.integration.soc_core import SoCCore
 from litex.soc.integration.common import get_mem_data
 from litex.soc.interconnect import wishbone
-from litex.soc.interconnect.csr import CSR
 from litex.build.generic_platform import GenericPlatform
-from litex_boards.platforms import digilent_netfpga_sume
+from litex.build.sim import SimPlatform
 
-from cores import Dilithium, PowerBridge, PowerController, add_rtl_sources
-from platforms import PetaliteSimPlatform
-from helpers import CommProtocol, arg_parser, generate_gtkw_savefile, KBYTE
+from cores import Dilithium, PowerBridge, PowerController
+from utils import CommProtocol, KBYTE
 
 
 class PetaliteCore(SoCCore):
     is_simulated: bool
+    platform_instance: GenericPlatform
+    comm_protocol: CommProtocol
+    bus_data_width: int
+    sys_clk_freq: int
 
     def __init__(
         self,
@@ -28,11 +28,13 @@ class PetaliteCore(SoCCore):
         debug_bridge: bool = False,
         trace: bool = False,
     ):
+        # Define some base attributes that are useful
+        self.bus_data_width = 64
         self.platform_instance = platform
-        self.is_simulated = isinstance(platform, PetaliteSimPlatform)
+        self.is_simulated = isinstance(platform, SimPlatform)
         self.sys_clk_freq = sys_clk_freq
         self.comm_protocol = comm_protocol
-        self.bus_data_width = 64
+        self.setup_buffer_allocator()
 
         # In theory, we could pass the integrated_rom_init to the SoC intiializer
         # In practice, there is a bug by which if you do that, the size of the ROM is incorrectly calculated
@@ -40,12 +42,14 @@ class PetaliteCore(SoCCore):
         # For that, we need do know the data_width and endianness of the CPU a priori, which is fine,
         # as long as we remember to change it if we switch CPUs
         integrated_rom_data = (
-            get_mem_data(integrated_rom_path, data_width=64, endianness="little")
+            get_mem_data(
+                integrated_rom_path, data_width=self.bus_data_width, endianness="little"
+            )
             if integrated_rom_path
             else []
         )
 
-        # SoC with CPU
+        # Base SoC declaration ---------------------------------------------------------
         SoCCore.__init__(
             self,
             # System specs
@@ -55,7 +59,7 @@ class PetaliteCore(SoCCore):
             # CPU specs
             cpu_type="rocket",
             cpu_variant="small",
-            bus_data_width=64,
+            bus_data_width=self.bus_data_width,
             clk_freq=sys_clk_freq,
             # Communication
             with_uart=False,
@@ -64,25 +68,20 @@ class PetaliteCore(SoCCore):
             integrated_rom_size=210 * KBYTE,
             integrated_sram_size=128 * KBYTE,
             integrated_rom_init=integrated_rom_data,
-            # integrated_main_ram_size=0x1_0000,  # TODO: cant use main_ram because of SBI...
         )
 
-        self.setup_mem_map()
-        self.setup_clk()
-
+        # Add cores to SoC ----------------------------------------------------------------
+        self.add_crg()
         self.add_id()
         self.add_io()
-
         self.add_dilithium()
-        if self.is_simulated:
-            self.add_config("SIM")
         if debug_bridge:
             self.add_etherbone_bridge()
 
-        # Simulation debugging ----------------------------------------------------------------------
+        # Simulation debugging ------------------------------------------------------------
+        # TODO: revise why we need to do this, and what it means
         if trace:
-            trace_reset_on = True
-            self.platform_instance.add_debug(self, reset=1 if trace_reset_on else 0)
+            self.platform_instance.add_debug(self, reset=1)
         elif self.is_simulated:
             self.comb += self.platform_instance.trace.eq(1)
 
@@ -106,7 +105,47 @@ class PetaliteCore(SoCCore):
                 l2_cache_size=8192,
             )
 
-    def setup_clk(self: SoCCore):
+    def setup_buffer_allocator(self: SoCCore):
+        # Simple IO memory bump-allocator
+        # TODO: revise this IO start address, because it probably
+        #       assumes changing the default Rocket memory map
+        self._io_base = 0x4100_0000  # start of your IO window
+        self._io_limit = 0x4200_0000  # optional safety limit (64 KiB here)
+        self._io_cur = self._io_base
+
+    def add_buffer(
+        self,
+        name: str,
+        size: int,
+        *,
+        custom: bool = True,
+        mode: str = "rw",
+        **ram_kwargs,
+    ):
+        def _next_pow2(x: int) -> int:
+            return 1 << (x - 1).bit_length()
+
+        # LiteX requires origin aligned to size rounded up to next power-of-two.
+        size_pow2 = _next_pow2(size)
+        required_al = max(8, size_pow2)  # keep at least 8-byte alignment
+
+        origin = (self._io_cur + (required_al - 1)) & ~(required_al - 1)
+        end = origin + size_pow2
+
+        if self._io_limit is not None and end > self._io_limit:
+            raise ValueError(
+                f"IO space exhausted adding '{name}': need 0x{size_pow2:X} at 0x{origin:X}, "
+                f"limit 0x{self._io_limit:X}"
+            )
+
+        self.add_ram(
+            name, origin=origin, size=size, custom=custom, mode=mode, **ram_kwargs
+        )
+
+        self._io_cur = end
+        return origin
+
+    def add_crg(self: SoCCore):
         # Add a CRG with two clock domains, a sys one and another that is always on
         # The two domains then need some extra structure to communicate properly
         if self.is_simulated:
@@ -148,46 +187,6 @@ class PetaliteCore(SoCCore):
         # 4. Gate the sys domain using the FSM
         self.comb += self.crg.power_down.eq(self.power_bridge.power_down)
 
-    def setup_mem_map(self: SoCCore):
-        # Simple IO memory bump-allocator
-        # TODO: revise this IO start address, because it probably
-        #       assumes changing the default Rocket memory map
-        self._io_base = 0x4100_0000  # start of your IO window
-        self._io_limit = 0x4200_0000  # optional safety limit (64 KiB here)
-        self._io_cur = self._io_base
-
-    def add_io_buffer(
-        self,
-        name: str,
-        size: int,
-        *,
-        custom: bool = True,
-        mode: str = "rw",
-        **ram_kwargs,
-    ):
-        def _next_pow2(x: int) -> int:
-            return 1 << (x - 1).bit_length()
-
-        # LiteX requires origin aligned to size rounded up to next power-of-two.
-        size_pow2 = _next_pow2(size)
-        required_al = max(8, size_pow2)  # keep at least 8-byte alignment
-
-        origin = (self._io_cur + (required_al - 1)) & ~(required_al - 1)
-        end = origin + size_pow2
-
-        if self._io_limit is not None and end > self._io_limit:
-            raise ValueError(
-                f"IO space exhausted adding '{name}': need 0x{size_pow2:X} at 0x{origin:X}, "
-                f"limit 0x{self._io_limit:X}"
-            )
-
-        self.add_ram(
-            name, origin=origin, size=size, custom=custom, mode=mode, **ram_kwargs
-        )
-
-        self._io_cur = end
-        return origin
-
     def add_id(self: SoCCore):
         if not self.is_simulated:
             from litex.soc.cores.dna import DNA
@@ -199,7 +198,7 @@ class PetaliteCore(SoCCore):
         if self.comm_protocol == CommProtocol.UART:
             self.add_uart(uart_name="sim" if self.is_simulated else "serial")
             # Add io buffers for receiving commands
-            self.add_io_buffer(
+            self.add_buffer(
                 name="tpm_cmd_buffer",
                 size=4 * KBYTE,
                 mode="rw",
@@ -208,14 +207,13 @@ class PetaliteCore(SoCCore):
         else:
             raise RuntimeError()
 
+    def add_trng(self: SoCCore):
+        pass
+
     def add_dilithium(self: SoCCore):
         # Add bus masters
-        wb_dilithium_reader = wishbone.Interface(
-            data_width=64,  # adr_width=32, addressing="byte"
-        )
-        wb_dilithium_writer = wishbone.Interface(
-            data_width=64,  # adr_width=32, addressing="byte"
-        )
+        wb_dilithium_reader = wishbone.Interface(data_width=64)
+        wb_dilithium_writer = wishbone.Interface(data_width=64)
         self.bus.add_master(name="dilithium_reader", master=wb_dilithium_reader)
         self.bus.add_master(name="dilithium_writer", master=wb_dilithium_writer)
 
@@ -241,82 +239,9 @@ class PetaliteCore(SoCCore):
         # I guess thats not ideal... but otherwise, the CPU was unable
         # to access the given mem position, like 0x83000000.
         # We also had to add an extra param to the add_ram method to account for that.
-        self.add_io_buffer(
+        self.add_buffer(
             name="dilithium_buffer",
             size=10 * KBYTE,  # NOTE: 10 kB for sim, but final design could have 8 kB
             mode="rw",
             custom=True,
         )
-
-
-def main():
-    args = arg_parser()
-
-    # Platform definition
-    platform = (
-        PetaliteSimPlatform(io_path=args.io_json)
-        if args.sim
-        else digilent_netfpga_sume.Platform()
-    )
-    add_rtl_sources(platform=platform, top_level_dir_path=args.rtl_dir_path)
-
-    # SoC definition
-    soc = PetaliteCore(
-        platform=platform,
-        sys_clk_freq=args.sys_clk_freq,
-        comm_protocol=args.comm,
-        integrated_rom_path=args.firmware,
-        trace=args.trace,
-        debug_bridge=args.debug_bridge,
-    )
-
-    # Building stage
-    builder = Builder(
-        soc=soc, output_dir=args.build_dir, compile_gateware=args.compile_gateware
-    )
-
-    if args.sim:
-        from litex.build.sim.config import SimConfig
-
-        sim_config = SimConfig()
-        sim_config.add_clocker("sys_clk", freq_hz=args.sys_clk_freq)
-        if args.comm == CommProtocol.UART:
-            sim_config.add_module("serial2tcp", ("serial", 0), args={"port": 4327})
-
-        if args.debug_bridge:
-            sim_config.add_module(
-                "ethernet", "eth", args={"interface": "tap0", "ip": "192.168.1.100"}
-            )
-
-        builder.build(
-            # Basic args
-            sim_config=sim_config,
-            run=args.load,
-            # Tracing
-            trace=args.trace,
-            trace_fst=args.trace,
-            trace_start=args.trace_start if args.trace else -1,
-            pre_run_callback=(
-                (lambda vns: generate_gtkw_savefile(builder, vns, True))
-                if args.trace
-                else None
-            ),
-            # Verilator optimizations
-            threads=8,  # runtime threads for Verilator
-            jobs=8,  # compile parallelism
-            opt_level="O3",
-            interactive=True,
-            coverage=False,
-            video=False,
-        )
-
-    else:
-        builder.build(**platform.get_argdict(platform.toolchain, {}))
-
-        if args.load:
-            prog = platform.create_programmer()
-            prog.load_bitstream(builder.get_bitstream_filename(mode="sram"))
-
-
-if __name__ == "__main__":
-    main()
