@@ -74,6 +74,7 @@ class PetaliteCore(SoCCore):
         self.add_crg()
         self.add_id()
         self.add_io()
+        self.add_trng()
         self.add_dilithium()
         if debug_bridge:
             self.add_etherbone_bridge()
@@ -217,7 +218,7 @@ class PetaliteCore(SoCCore):
 
             trng = RingOscillatorTRNG(platform=self.platform_instance)
 
-        self.submodules.trng = trng
+        self.submodules.trng = ClockDomainsRenamer({"sys": "sys_always_on"})(trng)
         self.add_csr("trng")
 
     def add_dilithium(self):

@@ -101,16 +101,12 @@ class RingOscillatorTRNG(Module, AutoCSR, AutoDoc):
         # keep track of how many bits have been shifted in since the last read-out
         self.sync += [
             If(
-                self.rand.we,
+                self.rand.re,  # READ of rand CSR = ACK/CLEAR
                 self.status.fields.fresh.eq(0),
-                self.rand.fields.rand.eq(0xDEADBEEF),
             )
             .Elif(
                 shift_rand,
-                If(
-                    rand_cnt < self.rand.size + 1,
-                    rand_cnt.eq(rand_cnt + 1),
-                ).Else(
+                If(rand_cnt < self.rand.size + 1, rand_cnt.eq(rand_cnt + 1)).Else(
                     self.rand.fields.rand.eq(rand_sync),
                     self.status.fields.fresh.eq(1),
                     rand_cnt.eq(0),
@@ -119,7 +115,7 @@ class RingOscillatorTRNG(Module, AutoCSR, AutoDoc):
             .Else(
                 self.status.fields.fresh.eq(self.status.fields.fresh),
                 self.rand.fields.rand.eq(self.rand.fields.rand),
-            ),
+            )
         ]
 
         # build a set of `element` rings, with `stage` stages
@@ -286,8 +282,10 @@ class RingOscillatorTRNG(Module, AutoCSR, AutoDoc):
 
 
 class SimTRNG(Module, AutoCSR):
-    def __init__(self, *, default_enable: int = True, seed: int = 0x1ACE_B00C):
-        # Match the original CSR shape so firmware doesn't care
+    def __init__(self, *, default_enable=True, seed=0x1ACE_B00C, width=32):
+        assert width in (8, 16, 32), "keep it simple for now"
+
+        # Control CSR (fields are Signals; no .storage on fields)
         self.ctl = CSRStorage(
             fields=[
                 CSRField("ena", size=1, reset=int(default_enable)),
@@ -296,30 +294,30 @@ class SimTRNG(Module, AutoCSR):
                 CSRField("delay", size=10, reset=8),
             ]
         )
-        self.rand = CSRStatus(
-            fields=[
-                CSRField("rand", size=32, reset=0)  # pick a width convenient for tests
-            ]
-        )
-        self.status = CSRStatus(fields=[CSRField("fresh", size=1)])
 
-        # Simple xorshift32 PRNG
+        # Data/status CSRs (mirroring the original)
+        self.rand = CSRStatus(fields=[CSRField("rand", size=width, reset=0)])
+        self.status = CSRStatus(fields=[CSRField("fresh", size=1, reset=0)])
+
+        # --- PRNG: xorshift32 ---
         state = Signal(32, reset=seed & 0xFFFF_FFFF)
+        next_state = Signal.like(state)
+        # Combinational xorshift32 step
+        s1 = Signal(32)
+        s2 = Signal(32)
+        s3 = Signal(32)
+        self.comb += [
+            s1.eq(state ^ (state << 13)),
+            s2.eq(s1 ^ (s1 >> 17)),
+            s3.eq(s2 ^ (s2 << 5)),
+            next_state.eq(s3),
+        ]
 
-        def xorshift32(s):
-            # combinational version
-            s1 = s ^ (s << 13)
-            s2 = s1 ^ (s1 >> 17)
-            s3 = s2 ^ (s2 << 5)
-            return s3 & 0xFFFF_FFFF
-
+        # --- Cadence (DWELL -> DELAY -> SAMPLE) ---
         dwell_cnt = Signal(self.ctl.fields.dwell.size)
         delay_cnt = Signal(self.ctl.fields.delay.size)
         sample_now = Signal()
-        shift_rand = Signal()
-        rand_cnt = Signal(6)  # how many bits/words gathered; adjust to taste
 
-        # Small FSM emulating dwell/delay cadence (like the real one)
         self.submodules.fsm = fsm = FSM(reset_state="IDLE")
         fsm.act(
             "IDLE",
@@ -333,7 +331,8 @@ class SimTRNG(Module, AutoCSR):
         fsm.act(
             "DWELL",
             If(dwell_cnt > 0, NextValue(dwell_cnt, dwell_cnt - 1)).Else(
-                shift_rand.eq(1), NextState("DELAY")
+                # mimic the hardware: shift happens after a dwell
+                NextState("DELAY")
             ),
         )
         fsm.act(
@@ -346,19 +345,16 @@ class SimTRNG(Module, AutoCSR):
             ),
         )
 
-        # Update PRNG and present words after "sample_now"
-        next_state = Signal.like(state)
-        self.comb += next_state.eq(xorshift32(state))
-
+        # --- Output/ack semantics (match hardware) ---
+        # fresh is set on SAMPLE; cleared on write to rand (rand.we)
         self.sync += [
             If(
-                self.ctl.re & self.ctl.fields.ena.storage,  # on write, clear fresh
-                self.status.fields.fresh.eq(0),
-            ).Elif(
                 sample_now,
-                # step PRNG a few times to mimic collecting multiple bits
                 state.eq(next_state),
-                self.rand.fields.rand.eq(next_state),
+                self.rand.fields.rand.eq(next_state[:width]),
                 self.status.fields.fresh.eq(1),
-            )
+            ).Elif(
+                self.rand.re,  # CPU READ-of-rand = ACK/CLEAR
+                self.status.fields.fresh.eq(0),
+            ),
         ]

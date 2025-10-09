@@ -15,6 +15,7 @@ class PetaliteCRG(LiteXModule):
         # Clock configs
         self.pll = pll = S7PLL(speedgrade=-2)
         pll.register_clkin(platform.request("clk200"), 200e6)
+        # TODO: shouldnt cpu_reset_n be active low? although this does work
         self.comb += pll.reset.eq(platform.request("cpu_reset_n") | self.rst)
         # System clock domain is gated by power_down, which allows
         # for "powering down" the TPM in some cases
@@ -41,9 +42,6 @@ class PetaliteCRG(LiteXModule):
             AsyncResetSynchronizer(self.cd_sys, reset_combo),
             AsyncResetSynchronizer(self.cd_sys_always_on, reset_combo),
         ]
-
-        # Vivado configs
-        platform.add_false_path_constraints(self.cd_sys.clk, pll.clkin)
 
 
 class PetaliteSimCRG(LiteXModule):
