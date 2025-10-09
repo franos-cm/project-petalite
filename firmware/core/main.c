@@ -1,10 +1,17 @@
 #include "transport.h"
+#include "trng.h"
+#include "log.h"
 #include "platform.h"
 #include "run_command.h"
 
 int main(void)
 {
+    // Init modules
+    trng_init(NULL);
+    log_init(0);
     transport_irq_init();
+
+    // Boot platform
     platform_cold_boot();
 
     _debug_transport_write_ready();
@@ -24,11 +31,8 @@ int main(void)
                 // Optionally pause RX/IRQs so the ingress path can't stomp the buffer
                 // receiver_pause();
                 _plat__RunCommand(cmd_len, tpm_cmd_buf, &resp_len, &resp_ptr);
-
                 _debug_transport_write_ready();
                 transport_write_rsp(resp_ptr, resp_len);
-
-                // Now send exactly resp_len bytes
                 // receiver_resume();
             }
             else
@@ -36,7 +40,8 @@ int main(void)
                 ;
             }
         }
-        // Optional: low-power wait
-        // asm volatile("wfi");
+        // Low-power wait.
+        // TODO: check if this actually works
+        asm volatile("wfi");
     }
 }

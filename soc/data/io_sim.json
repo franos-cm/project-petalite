@@ -22,9 +22,16 @@
         }
     },
     {
-        "name": "user_led",
+        "name": "serial_term",
         "index": 0,
-        "pins": "1"
+        "subsignals": {
+            "source_valid": { "pins": "1" },
+            "source_ready": { "pins": "1" },
+            "source_data": { "pins": "8" },
+            "sink_valid": { "pins": "1" },
+            "sink_ready": { "pins": "1" },
+            "sink_data": { "pins": "8" }
+        }
     },
     {
         "name": "eth_clocks",

@@ -13,7 +13,7 @@ from utils import CommProtocol, KBYTE
 
 class PetaliteCore(SoCCore):
     is_simulated: bool
-    platform_instance: GenericPlatform
+    platform: GenericPlatform
     comm_protocol: CommProtocol
     bus_data_width: int
     sys_clk_freq: int
@@ -30,7 +30,6 @@ class PetaliteCore(SoCCore):
     ):
         # Define some base attributes that are useful
         self.bus_data_width = 64
-        self.platform_instance = platform
         self.is_simulated = isinstance(platform, SimPlatform)
         self.sys_clk_freq = sys_clk_freq
         self.comm_protocol = comm_protocol
@@ -82,9 +81,9 @@ class PetaliteCore(SoCCore):
         # Simulation debugging ------------------------------------------------------------
         # TODO: revise why we need to do this, and what it means
         if trace:
-            self.platform_instance.add_debug(self, reset=1)
+            self.platform.add_debug(self, reset=1)
         elif self.is_simulated:
-            self.comb += self.platform_instance.trace.eq(1)
+            self.comb += self.platform.trace.eq(1)
 
         # SUME stuff ----------------------------------------------------------------------
         # TODO: check if these are the right conditions to check
@@ -93,7 +92,7 @@ class PetaliteCore(SoCCore):
             from litedram.phy import s7ddrphy
 
             self.ddrphy = s7ddrphy.V7DDRPHY(
-                platform.request("ddram"),
+                self.platform.request("ddram"),
                 memtype="DDR3",
                 nphases=4,
                 sys_clk_freq=sys_clk_freq,
@@ -152,7 +151,7 @@ class PetaliteCore(SoCCore):
         if self.is_simulated:
             from cores import PetaliteSimCRG
 
-            self.crg = PetaliteSimCRG(self.platform_instance.request("sys_clk"))
+            self.crg = PetaliteSimCRG(self.platform.request("sys_clk"))
         else:
             from cores import PetaliteCRG
 
@@ -197,7 +196,21 @@ class PetaliteCore(SoCCore):
 
     def add_io(self):
         if self.comm_protocol == CommProtocol.UART:
-            self.add_uart(uart_name="sim" if self.is_simulated else "serial")
+            if self.is_simulated:
+                # If we are simulating, we can have a UARt for interacting with the terminal
+                # NOTE: this one needs to be named uart so we can use Litex stdio
+                self.add_uart(
+                    name="uart",
+                    uart_name="sim",
+                    uart_pads=self.platform.request("serial_term"),
+                )
+
+            # We also have the one uart for TPM commands
+            self.add_uart(
+                name="cmd_uart",
+                uart_name="sim" if self.is_simulated else "serial",
+                uart_pads=self.platform.request("serial"),
+            )
             # Add io buffers for receiving commands
             self.add_buffer(
                 name="tpm_cmd_buffer",
@@ -205,6 +218,7 @@ class PetaliteCore(SoCCore):
                 mode="rw",
                 custom=True,
             )
+
         else:
             raise RuntimeError()
 
@@ -216,7 +230,7 @@ class PetaliteCore(SoCCore):
         else:
             from cores import RingOscillatorTRNG
 
-            trng = RingOscillatorTRNG(platform=self.platform_instance)
+            trng = RingOscillatorTRNG(platform=self.platform)
 
         self.submodules.trng = ClockDomainsRenamer({"sys": "sys_always_on"})(trng)
         self.add_csr("trng")

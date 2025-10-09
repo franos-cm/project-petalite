@@ -40,6 +40,7 @@ def main():
         sim_config.add_clocker("sys_clk", freq_hz=args.sys_clk_freq)
         if args.comm == CommProtocol.UART:
             sim_config.add_module("serial2tcp", ("serial", 0), args={"port": 4327})
+            sim_config.add_module("serial2console", ("serial_term", 0))
 
         if args.debug_bridge:
             sim_config.add_module(

@@ -97,14 +97,14 @@ INFO Could not detect the display scale (hDPI).
 
 ./scripts/build.sh
 ./scripts/build.sh --force-all
-./soc/petalite.py --sim --io-json=soc/data/io_sim.json --build-dir=builds/soc --compile-gateware --firmware=builds/firmware.bin --load
-OPTIONALLY: --load --trace --debug-bridge
+./soc/main.py --sim --io-json=soc/data/io_sim.json --build-dir=builds/soc --compile-gateware --firmware=builds/firmware.bin --load
+OPTIONALLY: --trace --debug-bridge
 python test/tpm.py
 
 
 ./scripts/build.sh --board
 ./scripts/build.sh --force-all --board
-./soc/petalite.py --build-dir=builds/soc --compile-gateware --firmware=builds/firmware.bin > synth-log-debug.txt
+./soc/main.py --build-dir=builds/soc --compile-gateware --firmware=builds/firmware.bin > synth-log-debug.txt
 OPTIONALLY: --load --trace --debug-bridge
 
 BOARD IS xc7vx690tffg1761-3

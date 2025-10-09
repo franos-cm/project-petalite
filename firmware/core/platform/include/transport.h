@@ -4,6 +4,7 @@
 #include <string.h>
 #include <irq.h>
 #include <generated/csr.h>
+#include <generated/soc.h>
 #include <libbase/uart.h>
 #include "platform.h"
 

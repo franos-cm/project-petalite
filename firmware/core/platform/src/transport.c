@@ -39,16 +39,16 @@ static void receiver_reset(void)
 static void rx_isr(void)
 {
     // Drain all available bytes quickly
-    while (!uart_rxempty_read())
+    while (!cmd_uart_rxempty_read())
     {
-        uint8_t b = uart_rxtx_read();
+        uint8_t b = cmd_uart_rxtx_read();
 
         // If a previous error or ready state hasn't been consumed, drop bytes (or mask RX)
         if (rx_state == RX_COMMAND_READY || rx_state == RX_ERROR)
         {
             // Optional: you could mask RX to apply backpressure:
-            // uint32_t en = uart_ev_enable_read();
-            // uart_ev_enable_write(en & ~UART_EV_RX);
+            // uint32_t en = cmd_uart_ev_enable_read();
+            // cmd_uart_ev_enable_write(en & ~UART_EV_RX);
             continue;
             // We should send an error message back or something like that
         }
@@ -67,23 +67,23 @@ static void rx_isr(void)
             rx_state = RX_COMMAND_READY;
 
         // Ack every byte (mirrors libbase pattern)
-        uart_ev_pending_write(UART_EV_RX);
+        cmd_uart_ev_pending_write(UART_EV_RX);
     }
 }
 
 static void transport_isr(void)
 {
-    uint32_t pending = uart_ev_pending_read();
+    uint32_t pending = cmd_uart_ev_pending_read();
 
     if (pending & UART_EV_RX)
     {
         rx_isr();
-        uart_ev_pending_write(UART_EV_RX);
+        cmd_uart_ev_pending_write(UART_EV_RX);
     }
 
     if (pending & UART_EV_TX)
     {
-        uart_ev_pending_write(UART_EV_TX);
+        cmd_uart_ev_pending_write(UART_EV_TX);
     }
 }
 
@@ -94,12 +94,12 @@ void transport_irq_init(void)
     receiver_reset();
 
     // Clear stale events and enable RX interrupts
-    uart_ev_pending_write(uart_ev_pending_read());
-    uart_ev_enable_write(UART_EV_RX); // enable RX only, for now
+    cmd_uart_ev_pending_write(cmd_uart_ev_pending_read());
+    cmd_uart_ev_enable_write(UART_EV_RX); // enable RX only, for now
 
     // Hook ISR and unmask at CPU/PLIC level
-    irq_attach(UART_INTERRUPT, transport_isr);
-    irq_setmask(irq_getmask() | (1u << UART_INTERRUPT));
+    irq_attach(CMD_UART_INTERRUPT, transport_isr);
+    irq_setmask(irq_getmask() | (1u << CMD_UART_INTERRUPT));
     irq_setie(1);
 }
 
@@ -125,8 +125,8 @@ uint32_t transport_read_command(void)
         receiver_reset();
 
     // Optional: re-enable RX if you masked it in ISR
-    // uint32_t en = uart_ev_enable_read();
-    // uart_ev_enable_write(en | UART_EV_RX);
+    // uint32_t en = cmd_uart_ev_enable_read();
+    // cmd_uart_ev_enable_write(en | UART_EV_RX);
 
     return rx_code;
 }
@@ -134,12 +134,12 @@ uint32_t transport_read_command(void)
 // TODO: make this better
 void transport_write_byte(uint8_t b)
 {
-    while (uart_txfull_read())
+    while (cmd_uart_txfull_read())
     {
     }
-    uart_rxtx_write(b);
+    cmd_uart_rxtx_write(b);
     // The TX event isn't enabled, but clearing it is good practice
-    uart_ev_pending_write(UART_EV_TX);
+    cmd_uart_ev_pending_write(UART_EV_TX);
 }
 
 void transport_write_rsp(const uint8_t *buf, uint32_t len)
