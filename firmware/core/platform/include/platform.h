@@ -11,6 +11,7 @@
 #include <pcrstruct.h>
 #include <prototypes/platform_pcr_fp.h>
 #include "platform_public_interface.h"
+#include "tpm_settings.h"
 
 #include <TpmConfiguration/TpmBuildSwitches.h>
 #include <TpmConfiguration/TpmProfile.h>

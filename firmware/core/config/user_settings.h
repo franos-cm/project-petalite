@@ -182,13 +182,11 @@ extern "C"
 
 #endif /* PROFILE_TINY_CRYPTO */
 
-    /* ============================================================
-     * RNG: default HashDRBG is fine; seed it from your platform.
-     * For HW RNG, plug a seed: CUSTOM_RAND_GENERATE or _BLOCK.
-     * ============================================================ */
-    /* #define HAVE_HASHDRBG */ /* implied by default; keep it */
-
-/* RNG: use platform entropy directly (no HashDRBG in wolfSSL) */
+/*
+Use platform entropy directly (no HashDRBG in wolfSSL)
+This way theres a single source of randomness across the whole codebase.
+NOTE: we are assuming the use of a HASHDRBG by the tpm code, which we should check for.
+*/
 #undef HAVE_HASHDRBG
 #define WC_NO_HASHDRBG
 

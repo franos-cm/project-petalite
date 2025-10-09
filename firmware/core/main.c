@@ -1,19 +1,15 @@
-#include "transport.h"
-#include "trng.h"
 #include "log.h"
 #include "platform.h"
+#include "transport.h"
 #include "run_command.h"
 
 int main(void)
 {
-    // Init modules
-    trng_init(NULL);
+    // Init logger when debugging through UART
     log_init(0);
-    transport_irq_init();
 
     // Boot platform
     platform_cold_boot();
-
     _debug_transport_write_ready();
 
     for (;;)
