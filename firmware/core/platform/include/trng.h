@@ -48,6 +48,7 @@ bool trng_try_read_u32(uint32_t *out);
 int trng_read_u32_timeout(uint32_t *out, uint64_t timeout_cycles);
 uint32_t trng_read_u32(void);
 int trng_read_bytes(uint8_t *out, size_t len);
+void trng_warmup(uint32_t max_count);
 // NOTE: these last two are for debugging and mostly unnecessary.
 //       also time measurements seem io bound when using logs.
 //       Maybe we should just delete these already.

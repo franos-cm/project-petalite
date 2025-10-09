@@ -101,6 +101,18 @@ int trng_read_bytes(uint8_t *out, size_t len)
     return 0;
 }
 
+void trng_warmup(uint32_t max_count)
+{
+    uint32_t a = trng_read_u32();
+    for (uint32_t i = 0; i < max_count; i++)
+    {
+        uint32_t b = trng_read_u32();
+        while (b == a)
+            b = trng_read_u32();
+        a = b;
+    }
+}
+
 // NOTE: these last functions are for debugging and mostly unnecessary
 //       also time measurements seem io bound when using logs, so not very trustworthy
 //       maybe we should delete these, if we dont use them in the near future

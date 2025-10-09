@@ -5,12 +5,9 @@
 #include "platform.h"
 #include "trng.h"
 #include "transport.h"
-
+#include "log.h"
 #if PLAT_ENTROPY_CONDITION_SHA256
 #include <wolfssl/wolfcrypt/sha256.h>
-#warning "PLAT_ENTROPY_CONDITION_SHA256 defined"
-#else
-#warning "PLAT_ENTROPY_CONDITION_SHA256 NOT defined"
 #endif
 
 // Fallbacks if not defined by headers
@@ -164,7 +161,8 @@ LIB_EXPORT int32_t _plat__GetEntropy(unsigned char *entropy, uint32_t amount)
     // Discard first 32-bit word exactly once after power/reset
     if (!s_have_last_entropy)
     {
-        s_last_entropy_word = trng_read_u32(); // not returned to caller
+        (void)trng_read_u32();
+        s_last_entropy_word = trng_read_u32();
         s_have_last_entropy = true;
     }
 
@@ -183,9 +181,12 @@ LIB_EXPORT int32_t _plat__GetEntropy(unsigned char *entropy, uint32_t amount)
         const uint32_t words = in_block / 4;
         for (uint32_t i = 0; i < words; ++i)
         {
+            // TODO: warmup should be unnecessary, but it doesnt seem to be the case, at least in sims
+            trng_warmup(1);
             uint32_t w = trng_read_u32();
             if (w == s_last_entropy_word)
             {
+                LOGE("GetEntropy fail (equal consecutive 32-bit words): %d", w);
                 return -1; // continuous test failure (sticky failure handled by caller)
             }
             s_last_entropy_word = w;
@@ -210,9 +211,12 @@ LIB_EXPORT int32_t _plat__GetEntropy(unsigned char *entropy, uint32_t amount)
     uint32_t produced = 0;
     while (produced < amount)
     {
+        // TODO: warmup should be unnecessary, but it doesnt seem to be the case, at least in sims
+        trng_warmup(1);
         uint32_t w = trng_read_u32();
         if (w == s_last_entropy_word)
         {
+            LOGE("GetEntropy fail (equal consecutive 32-bit words): %d", w);
             return -1; // continuous test failure
         }
         s_last_entropy_word = w;
