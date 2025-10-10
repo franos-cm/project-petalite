@@ -3,6 +3,7 @@ from migen.genlib.resetsync import AsyncResetSynchronizer
 from litex.gen import LiteXModule
 from litex.soc.cores.clock import S7PLL
 from litex.soc.interconnect.csr import CSRStorage, AutoCSR
+from litex.soc.cores.clock import S7IDELAYCTRL
 
 
 class PetaliteCRG(LiteXModule):
@@ -11,6 +12,10 @@ class PetaliteCRG(LiteXModule):
         self.power_down = Signal()
         self.cd_sys = ClockDomain()
         self.cd_sys_always_on = ClockDomain()
+        # Unsure why we need these ClockDomains, but synthesis fails otherwise
+        self.cd_sys4x = ClockDomain()
+        self.cd_idelay = ClockDomain()
+        self.cd_sfp = ClockDomain()
 
         # Clock configs
         self.pll = pll = S7PLL(speedgrade=-2)
@@ -35,6 +40,10 @@ class PetaliteCRG(LiteXModule):
             buf="bufgce",
             ce=pll.locked,
         )
+        # This is also needed for some reason
+        pll.create_clkout(self.cd_sys4x, 4 * sys_clk_freq)
+        pll.create_clkout(self.cd_idelay, 200e6)
+        pll.create_clkout(self.cd_sfp, 200e6)
 
         # Resets: both AO and SYS reset on rst or PLL unlock
         reset_combo = self.rst | (~pll.locked)
@@ -42,6 +51,14 @@ class PetaliteCRG(LiteXModule):
             AsyncResetSynchronizer(self.cd_sys, reset_combo),
             AsyncResetSynchronizer(self.cd_sys_always_on, reset_combo),
         ]
+
+        # Also required for synthesis for some reason
+        self.idelayctrl = S7IDELAYCTRL(self.cd_idelay)
+
+        # Add false path constraints for all generated clocks
+        platform.add_false_path_constraints(self.cd_sys.clk, pll.clkin)
+        platform.add_false_path_constraints(self.cd_sys_always_on.clk, pll.clkin)
+        platform.add_false_path_constraints(self.cd_sys4x.clk, pll.clkin)
 
 
 class PetaliteSimCRG(LiteXModule):

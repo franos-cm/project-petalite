@@ -123,32 +123,25 @@ static inline const char *log__lvl_col(log_level_t lvl)
     }
 }
 
-// ---------- Autodetect sink ----------
-static void log__autodetect_sink(void)
+// ---------- Init ----------
+void log_init(uint32_t sys_clk_hz)
 {
-#ifndef LOG_FORCE_ENABLE
+// Get frequency
+#ifdef CONFIG_CLOCK_FREQUENCY
+    log__sys_clk_hz = CONFIG_CLOCK_FREQUENCY;
+#else
+    log__sys_clk_hz = sys_clk_hz;
+#endif
+
+// Detect sink
 #ifdef CSR_UART_BASE
+    uart_init();
     log__writer = log__stdout_write;
     log__enabled = 1;
 #else
     log__writer = log__null_write;
     log__enabled = 0;
 #endif
-#else
-    log__writer = log__stdout_write;
-#endif
-}
-
-// ---------- Init ----------
-void log_init(uint32_t sys_clk_hz)
-{
-    uart_init();
-#ifdef CONFIG_CLOCK_FREQUENCY
-    log__sys_clk_hz = CONFIG_CLOCK_FREQUENCY;
-#else
-    log__sys_clk_hz = sys_clk_hz;
-#endif
-    log__autodetect_sink();
 }
 
 // ---------- Write helpers ----------

@@ -95,7 +95,7 @@ class RingOscillatorTRNG(Module, AutoCSR, AutoDoc):
         )  # single-sysclk wide pulse to indicate sampling time (after leaving dwell)
         rand_cnt = Signal(max=self.rand.size + 1)
         # synchronize the random output into the clock domain. RO, by definition, has no relationship to the core domain.
-        rand_sync = Signal(len(self.rand))
+        rand_sync = Signal(ro_elements - 1)
         self.specials += MultiReg(rand, rand_sync)
 
         # keep track of how many bits have been shifted in since the last read-out
@@ -120,30 +120,50 @@ class RingOscillatorTRNG(Module, AutoCSR, AutoDoc):
 
         # build a set of `element` rings, with `stage` stages
         for element in range(ro_elements):
-            setattr(self, "ro_elem" + str(element), Signal(ro_stages + 1))
+            # split node into ro_inN / ro_outN to avoid procedural writes to instance outputs
+            setattr(self, f"ro_in{element}", Signal())
+            setattr(self, f"ro_out{element}", Signal())
             setattr(self, "ro_samp" + str(element), Signal())
             setattr(self, "ro_samp_freerun" + str(element), Signal())
+
+            # construct ro_stages LUT1s from ro_in -> ... -> ro_out
+            prev = getattr(self, f"ro_in{element}")
             for stage in range(ro_stages):
-                stagename = "RINGOSC_E" + str(element) + "_S" + str(stage)
+                stagename = f"RINGOSC_E{element}_S{stage}"
+                next_sig = (
+                    getattr(self, f"ro_out{element}")
+                    if stage == ro_stages - 1
+                    else Signal()
+                )
+                if stage != ro_stages - 1:
+                    # keep intermediate net from being optimized in odd ways
+                    setattr(self, f"ro_mid{element}_{stage}", next_sig)
                 self.specials += Instance(
                     "LUT1",
                     name=stagename,
                     p_INIT=1,
-                    i_I0=getattr(self, "ro_elem" + str(element))[stage],
-                    o_O=getattr(self, "ro_elem" + str(element))[stage + 1],
+                    i_I0=prev,
+                    o_O=next_sig,
                     attr=("KEEP", "DONT_TOUCH"),
                 )
-                # add platform command to disable timing closure on ring oscillator paths
                 platform.add_platform_command(
                     "set_disable_timing -from I0 -to O [get_cells " + stagename + "]"
                 )
                 platform.add_platform_command(
                     "set_false_path -through [get_pins " + stagename + "/O]"
                 )
+                prev = next_sig
+
+            # feedback gate with enable
+            setattr(self, "ro_fbk" + str(element), Signal())
+            self.comb += getattr(self, "ro_fbk" + str(element)).eq(
+                getattr(self, f"ro_out{element}") & self.ctl.fields.ena
+            )
+
             # add "gang" sampler to pull out extra entropy during dwell mode
             if element != 32:  # element 32 is a special case, handled at end of loop
                 self.specials += MultiReg(
-                    getattr(self, "ro_elem" + str(element))[0],
+                    getattr(self, f"ro_out{element}"),
                     getattr(self, "ro_samp_freerun" + str(element)),
                 )
                 self.sync += [
@@ -158,16 +178,7 @@ class RingOscillatorTRNG(Module, AutoCSR, AutoDoc):
                         )
                     )
                 ]
-                # self.specials += Instance("FDCE", name='FDCE_E' + str(element),
-                #     i_D=getattr(self, "ro_elem" + str(element))[0],
-                #     i_C=ClockSignal(),
-                #     i_CE=self.ctl.fields.gang,
-                #     i_CLR=0,
-                #     o_Q=getattr(self, "ro_samp" + str(element))
-                # )
-            if (element != 0) & (
-                element != 32
-            ):  # element 0 is a special case, handled at end of loop
+            if (element != 0) & (element != 32):
                 self.sync += [
                     If(
                         sample_now,
@@ -182,26 +193,8 @@ class RingOscillatorTRNG(Module, AutoCSR, AutoDoc):
                         ),
                     )
                 ]
-            # close feedback loop with enable gate
-            setattr(self, "ro_fbk" + str(element), Signal())
-            self.comb += [
-                getattr(self, "ro_fbk" + str(element)).eq(
-                    getattr(self, "ro_elem" + str(element))[ro_stages]
-                    & self.ctl.fields.ena
-                ),
-            ]
-
         # build the input tap
-        # self.specials += Instance("FDCE", name='FDCE_E32',
-        #     i_D=getattr(self, "ro_elem32")[0],
-        #     i_C=ClockSignal(),
-        #     i_CE=1, # element 32 is not part of the gang, it's the output element of the "big loop"
-        #     i_CLR=0,
-        #     o_Q=getattr(self, "ro_samp32")
-        # )
-        self.specials += MultiReg(
-            getattr(self, "ro_elem32")[0], getattr(self, "ro_samp32")
-        )
+        self.specials += MultiReg(getattr(self, "ro_out32"), getattr(self, "ro_samp32"))
         self.sync += [
             If(
                 sample_now,
@@ -219,16 +212,16 @@ class RingOscillatorTRNG(Module, AutoCSR, AutoDoc):
         for element in range(ro_elements):
             if element < ro_elements - 1:
                 self.comb += (
-                    getattr(self, "ro_elem" + str(element))[0].eq(
-                        getattr(self, "ro_fbk" + str(element)) & dwell_now
-                        | getattr(self, "ro_fbk" + str(element + 1)) & ~dwell_now
+                    getattr(self, f"ro_in{element}").eq(
+                        getattr(self, f"ro_fbk{element}") & dwell_now
+                        | getattr(self, f"ro_fbk{element + 1}") & ~dwell_now
                     ),
                 )
             else:
                 self.comb += (
-                    getattr(self, "ro_elem" + str(element))[0].eq(
-                        getattr(self, "ro_fbk" + str(element)) & dwell_now
-                        | getattr(self, "ro_fbk" + str(0)) & ~dwell_now
+                    getattr(self, f"ro_in{element}").eq(
+                        getattr(self, f"ro_fbk{element}") & dwell_now
+                        | getattr(self, f"ro_fbk{0}") & ~dwell_now
                     ),
                 )
 
@@ -279,6 +272,22 @@ class RingOscillatorTRNG(Module, AutoCSR, AutoDoc):
                 ).Else(NextState("IDLE")),
             ),
         )
+
+        # acknowledge intentional RO loop
+        # platform.add_platform_command(
+        #     "set_property ALLOW_COMBINATORIAL_LOOPS TRUE [get_nets -hierarchical {{ {n} }}]",
+        #     n=getattr(self, "ro_in0"),  # any net in the loop; one is enough
+        # )
+
+        # Acknowledge the intentional ring-osc loops on all RINGOSC LUT outputs.
+        # This is local to these nets only; does not relax DRC globally.
+        for e in range(ro_elements):
+            sig_name = f"ro_in{e}"
+            if hasattr(self, sig_name):
+                platform.add_platform_command(
+                    "set_property ALLOW_COMBINATORIAL_LOOPS TRUE [get_nets -hierarchical {{ {n} }}]",
+                    n=getattr(self, sig_name),
+                )
 
 
 class SimTRNG(Module, AutoCSR):

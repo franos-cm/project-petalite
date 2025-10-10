@@ -8,7 +8,6 @@
 //   LOG_LEVEL:      0=DEBUG,1=INFO,2=WARN,3=ERROR,4=OFF (default: 0 in debug, 1 in release)
 //   LOG_USE_COLOR:  0/1 enable ANSI colors (default: 1)
 //   LOG_TS_IN_US:   0/1 timestamps in microseconds (needs clock freq) else cycles (default: 1)
-//   LOG_FORCE_ENABLE: 1 to force logging on even if no UART CSR is detected
 //   LOG_MODULE:     string tag for this compilation unit (default: file basename)
 // -----------------------------
 
