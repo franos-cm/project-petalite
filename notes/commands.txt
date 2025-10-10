@@ -99,13 +99,13 @@ INFO Could not detect the display scale (hDPI).
 ./scripts/build.sh --force-all
 ./soc/main.py --sim --io-json=soc/data/io_sim.json --build-dir=builds/soc --compile-gateware --firmware=builds/firmware.bin --load
 OPTIONALLY: --trace --debug-bridge
-python test/tpm.py
+python test/tpm.py --interactive --log
 
 
 ./scripts/build.sh --board
 ./scripts/build.sh --force-all --board
-./soc/main.py --build-dir=builds/soc --compile-gateware --firmware=builds/firmware.bin > synth-log-debug.txt
-OPTIONALLY: --load --trace --debug-bridge
+./soc/main.py --build-dir=builds/soc --compile-gateware --firmware=builds/firmware.bin &> synth-log.txt
+python test/tpm.py --serial --interactive --log
 
 BOARD IS xc7vx690tffg1761-3
 

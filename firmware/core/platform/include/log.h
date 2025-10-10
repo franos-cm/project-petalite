@@ -12,11 +12,7 @@
 // -----------------------------
 
 #ifndef LOG_LEVEL
-#ifdef NDEBUG
-#define LOG_LEVEL 1
-#else
 #define LOG_LEVEL 0
-#endif
 #endif
 
 #ifndef LOG_USE_COLOR

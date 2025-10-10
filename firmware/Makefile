@@ -194,6 +194,7 @@ TPM_INCLUDES := \
 # Compile flags specifically for the TPM library build:
 TPM_CFLAGS := $(CFLAGS) $(TPM_DEFS) $(TPM_INCLUDES) \
               -DWOLFSSL_USER_SETTINGS \
+			  -include "$(CONFIG_DIR)/tpm_settings.h" \
               -include "$(OSSL_INC)/options.h" \
               -include "$(OSSL_INC)/wolfcrypt/settings.h" \
               -include "$(OSSL_INC)/ssl.h" \

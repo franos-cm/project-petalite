@@ -19,7 +19,7 @@ def arg_parser():
     parser.add_argument(
         "--sys-clk-freq",
         type=str_to_int,
-        default=200e6,
+        default=125e6,
         help="System clock frequency",
     )
     parser.add_argument(

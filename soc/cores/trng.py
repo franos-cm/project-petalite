@@ -273,12 +273,6 @@ class RingOscillatorTRNG(Module, AutoCSR, AutoDoc):
             ),
         )
 
-        # acknowledge intentional RO loop
-        # platform.add_platform_command(
-        #     "set_property ALLOW_COMBINATORIAL_LOOPS TRUE [get_nets -hierarchical {{ {n} }}]",
-        #     n=getattr(self, "ro_in0"),  # any net in the loop; one is enough
-        # )
-
         # Acknowledge the intentional ring-osc loops on all RINGOSC LUT outputs.
         # This is local to these nets only; does not relax DRC globally.
         for e in range(ro_elements):

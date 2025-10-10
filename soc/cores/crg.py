@@ -13,7 +13,7 @@ class PetaliteCRG(LiteXModule):
         self.cd_sys = ClockDomain()
         self.cd_sys_always_on = ClockDomain()
         # Unsure why we need these ClockDomains, but synthesis fails otherwise
-        self.cd_sys4x = ClockDomain()
+        self.cd_sys4x = ClockDomain()  # TODO: check why these are needed
         self.cd_idelay = ClockDomain()
         self.cd_sfp = ClockDomain()
 
@@ -59,6 +59,14 @@ class PetaliteCRG(LiteXModule):
         platform.add_false_path_constraints(self.cd_sys.clk, pll.clkin)
         platform.add_false_path_constraints(self.cd_sys_always_on.clk, pll.clkin)
         platform.add_false_path_constraints(self.cd_sys4x.clk, pll.clkin)
+        platform.add_false_path_constraints(self.cd_idelay.clk, pll.clkin)
+        platform.add_false_path_constraints(self.cd_sfp.clk, pll.clkin)
+        # Affirm these two clocks are asynchronous (since sys can pause via BUFGCE)
+        platform.add_platform_command(
+            "set_clock_groups -asynchronous -group {{ {sys} }} -group {{ {ao} }}",
+            sys=self.cd_sys.clk,
+            ao=self.cd_sys_always_on.clk,
+        )
 
 
 class PetaliteSimCRG(LiteXModule):
@@ -108,7 +116,7 @@ class PowerBridge(LiteXModule):
 
         self.sync += [
             If(
-                self.power_down == 0,  # awake
+                ~self.power_down,  # awake
                 If(self.host_req_sleep | self.set_sleep_pulse, self.power_down.eq(1)),
             ).Else(  # sleeping
                 If(~self.host_req_sleep, self.power_down.eq(0))  # host releases -> wake

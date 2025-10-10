@@ -19,30 +19,42 @@ class TpmTester:
         body = self.uart.wait_for_bytes(num_bytes=(response_size - 10), timeout=timeout)
         return header + body
 
-    def startup_cmd(self):
-        startup_string = "80010000000C000001440000"
-        startup_bytestream = bytes.fromhex(startup_string)
+    def startup_cmd(self, startup_type: str = "CLEAR"):
+        # Map startup type to 2-byte parameter
+        st = (startup_type or "").strip().upper()
+        if st in ("0", "CLEAR", ""):
+            su_val = "0000"
+        elif st in ("1", "STATE"):
+            su_val = "0001"
+        else:
+            su_val = "0000"  # default CLEAR
+
+        # Full command: TPM_ST_NO_SESSIONS (0x8001), size 0x000C, TPM_CC_Startup (0x00000144), TPM_SU (2 bytes)
+        bytestring = f"80010000000C00000144{su_val}"
+        bytestream = bytes.fromhex(bytestring)
         print("Sending startup command...")
-        self.uart.send_bytes(startup_bytestream)
+        self.uart.send_bytes(bytestream)
 
         print("Waiting for startup answer...")
         self.wait_for_ready_signal()
-        result = self.uart.wait_for_bytes(num_bytes=10, timeout=40 * 60)
+        result = self.read_tpm_response(timeout=3600)
 
         if not result:
             raise RuntimeError("Failed to get startup answer, aborting")
         print("Startup cmd response:\n", " ".join(f"{b:02X}" for b in result))
         return result
 
-    def get_random_cmd(self):
-        getrandom_string = "80010000000C0000017B0020"  # 32 bytes
-        getrandom_bytestream = bytes.fromhex(getrandom_string)
-        print("Sending get_random_bytes() command...")
-        self.uart.send_bytes(getrandom_bytestream)
+    def get_random_cmd(self, num_bytes: int = 32):
+        # Replace fixed length with user choice
+        num_bytes = max(1, min(0xFFFF, int(num_bytes)))
+        bytestring = f"80010000000C0000017B{num_bytes:04X}"
+        bytestream = bytes.fromhex(bytestring.replace(" ", ""))
+        print(f"Sending get_random_bytes({num_bytes}) command...")
+        self.uart.send_bytes(bytestream)
 
         print("Waiting for get_random answer...")
         self.wait_for_ready_signal()
-        result = self.uart.wait_for_bytes(num_bytes=32 + 12, timeout=40 * 60)
+        result = self.read_tpm_response(timeout=3600)
 
         if not result:
             raise RuntimeError("Failed to get get_random_bytes() answer, aborting")
@@ -86,7 +98,7 @@ class TpmTester:
 
         print("Waiting for create_primary() answer...")
         self.wait_for_ready_signal()
-        result = self.read_tpm_response(timeout=45 * 60)
+        result = self.read_tpm_response(timeout=3600)
 
         if not result:
             raise RuntimeError("Failed to get create_primary() answer, aborting")
@@ -98,22 +110,72 @@ class TpmTester:
             print(f"Mismatch between expected and received [{name}]")
             res_list.append((name, expected, received))
 
-    def test_random(self):
-        self.wait_for_ready_signal()
-        self.startup_cmd()
-        self.get_random_cmd()
-        return True
-
-    def test_create_primary(self):
+    def test(self):
         self.wait_for_ready_signal()
         self.startup_cmd()
         self.create_primary_cmd()
         return True
 
-    def test(self, uart_conn: UARTConnection):
-        self.uart = uart_conn
-        result = self.test_create_primary()
-        return result
+    def repl(self):
+        print("\nWaiting for SoC to signal it is READY...")
+        self.wait_for_ready_signal()
+        print("\nInteractive TPM tester. Type 'help' for options.")
+        # Optional startup first
+        try:
+            ans = input("Send TPM2_Startup first? [Y/n] ").strip().lower()
+        except EOFError:
+            ans = "y"
+        if ans in ("", "y", "yes"):
+            try:
+                su = input("Startup type? [CLEAR/state] ").strip().upper() or "CLEAR"
+            except EOFError:
+                su = "CLEAR"
+            self.startup_cmd(startup_type="CLEAR" if su != "STATE" else "STATE")
+
+        while True:
+            try:
+                cmd = (
+                    input("\nCommand [startup|get_random|create_primary|help|quit]: ")
+                    .strip()
+                    .lower()
+                )
+            except EOFError:
+                cmd = "quit"
+
+            if cmd in ("quit", "exit", "q"):
+                print("Exiting.")
+                return True
+            if cmd in ("help", "?"):
+                print("Available commands:")
+                print("  startup        - send TPM2_Startup (choose CLEAR or STATE)")
+                print("  get_random     - request N random bytes")
+                print("  create_primary - send CreatePrimary sample command")
+                print("  quit           - exit")
+                continue
+
+            if cmd == "startup":
+                try:
+                    su = (
+                        input("Startup type? [CLEAR/state] ").strip().upper() or "CLEAR"
+                    )
+                except EOFError:
+                    su = "CLEAR"
+                self.startup_cmd(startup_type="CLEAR" if su != "STATE" else "STATE")
+                continue
+
+            if cmd == "get_random":
+                try:
+                    n = int(input("How many bytes? [32] ").strip() or "32")
+                except Exception:
+                    n = 32
+                self.get_random_cmd(num_bytes=n)
+                continue
+
+            if cmd == "create_primary":
+                self.create_primary_cmd()
+                continue
+
+            print("Unknown command. Type 'help'.")
 
 
 def parse_args():
@@ -151,6 +213,22 @@ def parse_args():
         default=115200,
         help="Baud rate for serial mode (default: 115200)",
     )
+    parser.add_argument(
+        "--interactive",
+        action="store_true",
+        help="Interactive mode (menu-driven).",
+    )
+    parser.add_argument(
+        "--log",
+        action="store_true",
+        help="Route UART logs to a timestamped file.",
+    )
+    parser.add_argument(
+        "--log-name",
+        type=str,
+        default="uart-log",
+        help="Base filename for UART logs (timestamp and .log will be appended).",
+    )
     return parser.parse_args()
 
 
@@ -161,6 +239,13 @@ def main():
     tcp_port = args.tcp_port
     serial_dev = args.serial_dev
     baud = args.baud
+
+    # Build timestamped log path if requested
+    log_path = None
+    if getattr(args, "log", False):
+        ts = time.strftime("%Y%m%d-%H%M%S")
+        base = args.log_name
+        log_path = f"{base}-{ts}.log"
 
     try:
         tester = TpmTester()
@@ -173,6 +258,7 @@ def main():
                 baudrate=baud,
                 serial_timeout=0.1,
                 debug=True,
+                log_path=log_path,
             )
         else:
             uart = UARTConnection(
@@ -181,9 +267,17 @@ def main():
                 tcp_port=tcp_port,
                 tcp_connect_timeout=600,
                 debug=True,
+                log_path=log_path,
             )
 
-        success = tester.test(uart_conn=uart)
+        # Ensure REPL has a bound UART
+        tester.uart = uart
+
+        if args.interactive:
+            success = tester.repl()
+        else:
+            success = tester.test()
+
         print(f"\n{'✅ Test passed!' if success else '❌ Test failed!'}")
 
     except Exception as e:
