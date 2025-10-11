@@ -59,14 +59,8 @@ class PetaliteCRG(LiteXModule):
         platform.add_false_path_constraints(self.cd_sys.clk, pll.clkin)
         platform.add_false_path_constraints(self.cd_sys_always_on.clk, pll.clkin)
         platform.add_false_path_constraints(self.cd_sys4x.clk, pll.clkin)
-        platform.add_false_path_constraints(self.cd_idelay.clk, pll.clkin)
-        platform.add_false_path_constraints(self.cd_sfp.clk, pll.clkin)
-        # Affirm these two clocks are asynchronous (since sys can pause via BUFGCE)
-        platform.add_platform_command(
-            "set_clock_groups -asynchronous -group {{ {sys} }} -group {{ {ao} }}",
-            sys=self.cd_sys.clk,
-            ao=self.cd_sys_always_on.clk,
-        )
+        # Make sure these two clocks are asynchronous (since sys can pause via BUFGCE)
+        platform.add_false_path_constraints(self.cd_sys.clk, self.cd_sys_always_on.clk)
 
 
 class PetaliteSimCRG(LiteXModule):
