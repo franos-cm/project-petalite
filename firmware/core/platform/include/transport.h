@@ -1,11 +1,10 @@
-#ifndef TRANSPORT_H
-#define TRANSPORT_H
-
+#pragma once
 #include <stdint.h>
 #include <stdbool.h>
 #include <string.h>
 #include <irq.h>
 #include <generated/csr.h>
+#include <generated/soc.h>
 #include <libbase/uart.h>
 #include "platform.h"
 
@@ -46,5 +45,3 @@ void transport_write_byte(uint8_t b);
 void transport_write_rsp(const uint8_t *buf, uint32_t len);
 void _debug_transport_write_ready(void);
 void debug_breakpoint(uint8_t b);
-
-#endif // TRANSPORT_H

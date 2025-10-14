@@ -8,7 +8,6 @@ try:
 except Exception:
     serial = None
 
-
 from utils import (
     DILITHIUM_ACK_BYTE,
     DILITHIUM_READY_BYTE,
@@ -75,15 +74,19 @@ class UARTConnection:
         serial_timeout: float = 0.1,
         name: str = None,
         debug: bool = True,
+        # File logging options
+        log_path: str | None = None,
+        log_writes: bool = True,
     ):
         self.name = name
-        self.debug = debug
+        # Keep original debug flag semantics
+        self.debug = bool(debug)
         self.running = False
-        # NEW: remember mode and configure per-byte read logging for serial
         self.mode = mode
+
         self.log_read_each_byte = mode == "serial"
 
-        # NEW: transport abstraction with TCP or Serial
+        # Transport open
         self.transport = None
         if mode == "serial":
             if serial is None:
@@ -100,7 +103,7 @@ class UARTConnection:
         else:
             raise ValueError("mode must be 'tcp' or 'serial'")
 
-        # Thread-safe queues
+        # Queues
         self.received_data = queue.Queue()
         self.send_queue = queue.Queue()
 
@@ -108,77 +111,93 @@ class UARTConnection:
         self.running = True
         self.read_thread = threading.Thread(target=self._read_worker, daemon=True)
         self.write_thread = threading.Thread(target=self._write_worker, daemon=True)
-
         self.read_thread.start()
         self.write_thread.start()
+        if self.debug:
+            print(f"{self._id()} Read/Write threads started")
 
-        print(f"{self._id()} Read/Write threads started")
-
-        # Internal pushback buffer for preserving byte order when a control byte
-        # (e.g., READY/ACK) arrives in the same read as subsequent payload bytes.
-        # We always consume from this buffer before the queue to avoid reordering.
+        # Rolling pushback buffer
         self._pushback = bytearray()
+
+        # File logging
+        self.log_path = log_path
+        self.log_writes = log_writes
+        self._log_fp = None
+        if self.log_path:
+            try:
+                self._log_fp = open(self.log_path, "a", buffering=1, encoding="utf-8")
+                # Timestamped header
+                ts = time.strftime("%Y-%m-%d %H:%M:%S")
+                self._log_fp.write(f"[{ts}] === UART log started ===\n")
+            except Exception as e:
+                print(f"{self._id()}[LOG] Failed to open log file: {e}")
+                self._log_fp = None
 
     def _id(self):
         return f"[{self.name}]" if self.name else ""
 
     def _open_tcp(self, host, port, max_wait):
         """Retry TCP connection to simulation until timeout (original style)"""
-        print(
-            f"{self._id()} Connecting to {host}:{port}... (will wait up to {max_wait}s)"
-        )
-
+        self._console(f"Connecting to {host}:{port}... (will wait up to {max_wait}s)")
         try_count = 0
         start_time = time.time()
-
         while time.time() - start_time < max_wait:
             try:
-                # Create a fresh socket each attempt (mirrors original semantics, avoids bad states)
                 sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
                 sock.connect((host, port))
                 elapsed = time.time() - start_time
-                print(
-                    f"✅{self._id()} Connected to simulation after {elapsed:.2f} seconds!"
-                )
-                # Preserve original attribute name for parity
+                self._console(f"✅ Connected after {elapsed:.2f} seconds!")
                 self.sock = sock
                 self.transport = _SocketTransport(sock)
                 return
-
             except (ConnectionRefusedError, socket.timeout):
                 try:
                     sock.close()
                 except Exception:
                     pass
                 elapsed = time.time() - start_time
-                print(
-                    f"{self._id()}[{elapsed:.2f}s] Simulation not ready yet (attempt {try_count}). Retrying..."
+                self._console(
+                    f"[{elapsed:.2f}s] Not ready yet (attempt {try_count}). Retrying..."
                 )
                 try_count += 1
                 time.sleep(0.1)
-
         raise TimeoutError(
-            f"❌{self._id()} Could not connect to simulation at {host}:{port} after {max_wait} seconds"
+            f"❌ Could not connect to {host}:{port} after {max_wait} seconds"
         )
 
-    # NEW: Serial opener
     def _open_serial(self, serial_port: str, baudrate: int, timeout: float):
-        print(
-            f"Opening serial port {serial_port} @ {baudrate} baud (timeout={timeout}s)..."
+        self._console(
+            f"Opening serial {serial_port} @ {baudrate} (timeout={timeout}s)..."
         )
         ser = serial.Serial(
             port=serial_port, baudrate=baudrate, timeout=timeout, write_timeout=timeout
         )
-        # Flush any stale data
         try:
             ser.reset_input_buffer()
             ser.reset_output_buffer()
         except Exception:
             pass
-        # Small delay to allow device reset (common on USB CDC)
         time.sleep(0.1)
         self.transport = _SerialTransport(ser)
-        print(f"✅{self._id()} Serial port opened")
+        self._console("✅ Serial port opened")
+
+    # Unified console/file helpers
+    def _console(self, msg: str):
+        if self.debug:
+            print(f"{self._id()} {msg}")
+
+    def _emit_log_line(self, line: str):
+        if self._log_fp:
+            try:
+                self._log_fp.write(line + "\n")
+            except Exception:
+                pass
+        else:
+            print(line)
+
+    # NEW: simple HH:MM:SS timestamp for log lines
+    def _ts(self) -> str:
+        return time.strftime("%H:%M:%S")
 
     def _read_worker(self):
         """Background thread that continuously reads from transport"""
@@ -188,19 +207,22 @@ class UARTConnection:
                 data = self.transport.recv(64)
                 if data:
                     self.received_data.put(("data", data, time.time()))
+                    # Keep original behavior and format; just route to file if set
                     if self.debug:
-                        # Print each byte separately when enabled (serial)
-                        if getattr(self, "log_read_each_byte", False):
+                        if self.log_read_each_byte:
                             for b in data:
-                                print(f"{self._id()}[READ] {b:02x}")
+                                self._emit_log_line(
+                                    f"[{self._ts()}] {self._id()}[READ] {b:02x}"
+                                )
                         else:
-                            print(f"{self._id()}[READ] {data.hex()}")
+                            self._emit_log_line(
+                                f"[{self._ts()}] {self._id()}[READ] {data.hex()}"
+                            )
             except socket.timeout:
-                # Non-fatal: simply try again
                 continue
             except Exception as e:
                 if self.running:
-                    print(f"{self._id()}[READ ERROR] {e}")
+                    self._console(f"[READ ERROR] {e}")
                     self.received_data.put(("error", str(e), time.time()))
                 break
 
@@ -210,13 +232,20 @@ class UARTConnection:
             try:
                 command = self.send_queue.get(timeout=0.1)
                 if command:
+                    # Keep original formatting for writes
                     if self.debug:
                         if isinstance(command, bytes):
-                            print(f"{self._id()}[WRITE] 0x{command.hex().upper()}")
+                            self._emit_log_line(
+                                f"[{self._ts()}] {self._id()}[WRITE] 0x{command.hex().upper()}"
+                            )
                         elif isinstance(command, int):
-                            print(f"{self._id()}[WRITE] 0x{command:X}")
+                            self._emit_log_line(
+                                f"[{self._ts()}] {self._id()}[WRITE] 0x{command:X}"
+                            )
                         else:
-                            print(f"{self._id()}[WRITE] {repr(command)}")
+                            self._emit_log_line(
+                                f"[{self._ts()}] {self._id()}[WRITE] {repr(command)}"
+                            )
 
                     if isinstance(command, str):
                         command = command.encode()
@@ -229,7 +258,7 @@ class UARTConnection:
                 continue
             except Exception as e:
                 if self.running:
-                    print(f"{self._id()}[WRITE ERROR] {e}")
+                    self._console(f"[WRITE ERROR] {e}")
 
     def send_bytes(self, data):
         """Send multiple bytes"""
@@ -282,31 +311,32 @@ class UARTConnection:
                 if msg_type == "data" and data:
                     for idx, byte in enumerate(data):
                         if byte == expected_byte:
-                            # Stash any remaining bytes locally to preserve ordering
                             if idx + 1 < len(data):
                                 remaining = data[idx + 1 :]
                                 self._pushback.extend(remaining)
                             if signal_name:
                                 elapsed = time.perf_counter() - start_time
-                                print(
+                                self._console(
                                     f"[{signal_name.upper()}] Received in {elapsed:.3f} seconds"
                                 )
                             return True
-                    # No match in this chunk; continue
                 elif msg_type == "error":
-                    print(f"{self._id()}[ERROR] {data}")
+                    self._console(f"[ERROR] {data}")
                     return False
 
             except queue.Empty:
                 continue
 
-        print(
-            f"{self._id()}[TIMEOUT] No {signal_name.upper()} received in {timeout:.3f} seconds"
+        self._console(
+            f"[TIMEOUT] No {signal_name.upper()} received in {timeout:.3f} seconds"
         )
         return False
 
-    def wait_for_bytes(self, num_bytes, timeout=5):
+    def wait_for_bytes(self, num_bytes, timeout=5) -> bytes:
         """Wait for specific number of bytes"""
+        if not num_bytes:
+            return bytes()
+
         start_time = time.perf_counter()
         buffer = bytearray()
 
@@ -364,15 +394,15 @@ class UARTConnection:
         return response_header
 
     def send_ack(self):
-        print(f"\t{self._id()}[ACK] Sending ACK...")
+        self._console("[ACK] Sending ACK...")
         self.send_bytes(DILITHIUM_ACK_BYTE)
 
     def send_sync(self):
-        print(f"\t{self._id()}[SYNC] Sending SYNC...")
+        self._console("[SYNC] Sending SYNC...")
         self.send_bytes(DILITHIUM_SYNC_BYTE)
 
     def send_start(self):
-        print(f"\t{self._id()}[START] Sending START...")
+        self._console("[START] Sending START...")
         self.send_bytes(DILITHIUM_START_BYTE)
 
     def send_in_chunks(
@@ -387,13 +417,13 @@ class UARTConnection:
             end = start + chunk_size
             data_chunk = data[start:end]
 
-            print(
-                f"\t{self._id()} Sending {data_name}({chunk_num+1}/{total_chunks}),"
+            self._console(
+                f"Sending {data_name}({chunk_num+1}/{total_chunks}),"
                 f"({len(data_chunk)} bytes): {data_chunk[:8].hex()}..."
             )
             self.send_bytes(data_chunk)
             if not self.wait_for_ack():
-                print(f"{self._id()} Failed to get {data_name} ({chunk_num+1}) ACK")
+                self._console(f"Failed to get {data_name} ({chunk_num+1}) ACK")
                 return False
 
     def receive_in_chunks(
@@ -418,45 +448,44 @@ class UARTConnection:
         total_chunks = (total_bytes + chunk_size - 1) // chunk_size
 
         if data_name:
-            print(
-                f"\t{self._id()} Receiving {data_name} ({total_bytes} bytes) in {total_chunks} chunks..."
+            self._console(
+                f"Receiving {data_name} ({total_bytes} bytes) in {total_chunks} chunks..."
             )
 
         for chunk_num in range(total_chunks):
             bytes_to_receive = min(chunk_size, total_bytes - len(full_data))
 
             if self.debug:
-                print(
-                    f"\t{self._id()} Receiving {data_name} chunk ({chunk_num + 1}/{total_chunks}), waiting for {bytes_to_receive} bytes..."
+                self._console(
+                    f"Receiving {data_name} chunk ({chunk_num + 1}/{total_chunks}), "
+                    f"waiting for {bytes_to_receive} bytes..."
                 )
 
-            # Wait for the next chunk of data
             data_chunk = self.wait_for_bytes(
                 num_bytes=bytes_to_receive, timeout=timeout_per_chunk
             )
 
             if not data_chunk or len(data_chunk) < bytes_to_receive:
-                print(
-                    f"❌{self._id()} Failed to receive {data_name} chunk ({chunk_num + 1}). Timed out."
+                self._console(
+                    f"❌ Failed to receive {data_name} chunk ({chunk_num + 1}). Timed out."
                 )
                 return None
 
             full_data += data_chunk
 
-            # Acknowledge receipt of the chunk
             self.send_ack()
             if self.debug:
-                print(f"\t✅{self._id()} ACK'd chunk {chunk_num + 1}/{total_chunks}")
+                self._console(f"✅ ACK'd chunk {chunk_num + 1}/{total_chunks}")
 
         if len(full_data) == total_bytes:
             if data_name:
-                print(
-                    f"✅{self._id()} Successfully received all {total_bytes} bytes of {data_name}."
+                self._console(
+                    f"✅ Successfully received all {total_bytes} bytes of {data_name}."
                 )
             return full_data
         else:
-            print(
-                f"❌{self._id()} Error: Expected {total_bytes} bytes, but received {len(full_data)}."
+            self._console(
+                f"❌ Error: Expected {total_bytes} bytes, but received {len(full_data)}."
             )
             return None
 
@@ -474,7 +503,7 @@ class UARTConnection:
 
     def close(self):
         """Clean shutdown"""
-        print(f" {self._id()} Shutting down UART connection...")
+        self._console("Shutting down UART connection...")
         self.running = False
         self.read_thread.join(timeout=1)
         self.write_thread.join(timeout=1)
@@ -482,4 +511,11 @@ class UARTConnection:
             self.transport.close()
         except Exception:
             pass
-        print(f"{self._id()} UART connection closed")
+        if self._log_fp:
+            try:
+                ts = time.strftime("%Y-%m-%d %H:%M:%S")
+                self._log_fp.write(f"[{ts}] === UART log closed ===\n")
+                self._log_fp.close()
+            except Exception:
+                pass
+        self._console("UART connection closed")

@@ -72,7 +72,7 @@ cd "$REPO_DIR"
 
 SOC_BUILD_DIR="$REPO_DIR/builds/soc"
 FIRMWARE_HELPER="$REPO_DIR/firmware/firmware.py"
-SOC_SCRIPT="$REPO_DIR/soc/petalite.py"
+SOC_SCRIPT="$REPO_DIR/soc/main.py"
 
 # --------- pretty printing helpers ---------
 if command -v tput >/dev/null 2>&1 && [ -n "${TERM:-}" ]; then

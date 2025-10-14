@@ -97,15 +97,15 @@ INFO Could not detect the display scale (hDPI).
 
 ./scripts/build.sh
 ./scripts/build.sh --force-all
-./soc/petalite.py --sim --io-json=soc/data/io_sim.json --build-dir=builds/soc --compile-gateware --firmware=builds/firmware.bin --load
-OPTIONALLY: --load --trace --debug-bridge
-python test/tpm.py
+./soc/main.py --sim --io-json=soc/data/io_sim.json --build-dir=builds/soc --compile-gateware --firmware=builds/firmware.bin --load
+OPTIONALLY: --trace --debug-bridge
+python test/tpm.py --interactive --log
 
 
 ./scripts/build.sh --board
 ./scripts/build.sh --force-all --board
-./soc/petalite.py --build-dir=builds/soc --compile-gateware --firmware=builds/firmware.bin > synth-log-debug.txt
-OPTIONALLY: --load --trace --debug-bridge
+./soc/main.py --build-dir=builds/soc --compile-gateware --firmware=builds/firmware.bin &> synth-log.txt
+python test/tpm.py --serial --interactive --log
 
 BOARD IS xc7vx690tffg1761-3
 
@@ -191,3 +191,7 @@ So next steps:
     1. Run tpm with wolfssl on host machine
     2. Run SoC on board, time it.
     3. Figure out from there.
+
+
+Add a second uart just so we can send control signals?
+or drive one uart from two different places? what clock domain should it be in?

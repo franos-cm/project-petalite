@@ -1,5 +1,4 @@
 #include "platform.h"
-#include "transport.h"
 
 void platform_cold_boot(void)
 {

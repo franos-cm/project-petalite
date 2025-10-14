@@ -194,6 +194,7 @@ TPM_INCLUDES := \
 # Compile flags specifically for the TPM library build:
 TPM_CFLAGS := $(CFLAGS) $(TPM_DEFS) $(TPM_INCLUDES) \
               -DWOLFSSL_USER_SETTINGS \
+			  -include "$(CONFIG_DIR)/tpm_settings.h" \
               -include "$(OSSL_INC)/options.h" \
               -include "$(OSSL_INC)/wolfcrypt/settings.h" \
               -include "$(OSSL_INC)/ssl.h" \
@@ -201,7 +202,7 @@ TPM_CFLAGS := $(CFLAGS) $(TPM_DEFS) $(TPM_INCLUDES) \
               -Wno-error=cpp -Wno-error=unused-value -Wno-error=unused-parameter \
               -Wno-error=expansion-to-defined -Wno-error=missing-prototypes \
 			  -Wno-error=implicit-fallthrough -Wno-error=deprecated-declarations \
-			  -Wno-strict-prototypes
+			  -Wno-error=unused-function -Wno-strict-prototypes
 # TODO: -Wno-error=expansion-to-defined might break something
 # We do this specifically to these files only
 $(TPM_OBJ_DIR)/tpm/src/main/CommandDispatcher.o: TPM_CFLAGS += -Wno-cast-function-type

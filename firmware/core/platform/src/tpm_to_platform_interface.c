@@ -1,6 +1,14 @@
 // Minimal platform shim for MS TPM 2.0 reference core on bare-metal.
-// Safe to compile/link; replace TODO sections with your hardware hooks.
+// TODO: replace sections with hardware hooks, and revise behaviour as a whole.
+#include <string.h>
+#include <stdint.h>
 #include "platform.h"
+#include "trng.h"
+#include "transport.h"
+#include "log.h"
+#if PLAT_ENTROPY_CONDITION_SHA256
+#include <wolfssl/wolfcrypt/sha256.h>
+#endif
 
 // Fallbacks if not defined by headers
 #ifndef LIB_EXPORT
@@ -38,9 +46,9 @@ static uint8_t s_nv_image[NV_MEMORY_SIZE];
 static uint8_t s_nv_shadow[NV_MEMORY_SIZE];
 static int s_nv_dirty = 0;
 
-// Optional: simple PRNG for _plat__GetEntropy when no TRNG is wired yet.
-// NOTE: NOT CRYPTO-QUALITY. For compile-time only.
-static uint32_t s_xorshift = 2463534242u;
+// FIPS continuous test TRNG state (32-bit samples, change according to core)
+static uint32_t s_last_entropy_word = 0;
+static bool s_have_last_entropy = false;
 
 // Vendor/firmware identifiers (pick meaningful values for your product)
 static inline uint32_t fourcc(const char a[4])
@@ -63,6 +71,14 @@ int _plat__Signal_PowerOn(void)
     // If your hardware timer might have gone backwards across power,
     // call _plat__TimerReset() semantics:
     s_timer_reset_flag = 1;
+
+    // Initialize modules. TODO: should we do this on power-on or somewhere else?
+    // Initialize TRNG with defaults
+    trng_init(NULL);
+    s_have_last_entropy = false;
+    s_last_entropy_word = 0;
+    // Initialize uart and its interrupt service
+    transport_irq_init();
 
     return 0;
 }
@@ -135,23 +151,84 @@ void DebugDumpBuffer(int size, unsigned char *buf, const char *id)
 #endif
 
 // ---------- Entropy.c ----------
-
 LIB_EXPORT int32_t _plat__GetEntropy(unsigned char *entropy, uint32_t amount)
 {
-    // TODO: wire to a real TRNG. This xorshift is ONLY to unblock bringup.
     if (!entropy)
         return -1;
-    for (uint32_t i = 0; i < amount; ++i)
+    if (amount == 0)
+        return 0;
+
+    // Discard first 32-bit word exactly once after power/reset
+    if (!s_have_last_entropy)
     {
-        // Xorshift32
-        uint32_t x = s_xorshift;
-        x ^= x << 13;
-        x ^= x >> 17;
-        x ^= x << 5;
-        s_xorshift = x;
-        entropy[i] = (unsigned char)(x & 0xFF);
+        (void)trng_read_u32();
+        s_last_entropy_word = trng_read_u32();
+        s_have_last_entropy = true;
+    }
+
+#if PLAT_ENTROPY_CONDITION_SHA256
+    // SHA-256 conditioner at 2:1 ratio (64 in -> 32 out)
+    const uint32_t out_block = 32;
+    const uint32_t in_block = PLAT_ENTROPY_CONDITION_IN_PER_OUT32;
+    unsigned char digest[out_block];
+    unsigned char noise[in_block];
+
+    uint32_t produced = 0;
+    while (produced < amount)
+    {
+        // Fill 'noise' by reading words with continuous test
+        uint32_t *wptr = (uint32_t *)noise;
+        const uint32_t words = in_block / 4;
+        for (uint32_t i = 0; i < words; ++i)
+        {
+            // TODO: warmup should be unnecessary, but it doesnt seem to be the case, at least in sims
+            trng_warmup(1);
+            uint32_t w = trng_read_u32();
+            if (w == s_last_entropy_word)
+            {
+                LOGE("GetEntropy fail (equal consecutive 32-bit words): %d", w);
+                return -1; // continuous test failure (sticky failure handled by caller)
+            }
+            s_last_entropy_word = w;
+            wptr[i] = w; // little-endian platform; byte order of noise doesn't matter to hash
+        }
+
+        // Hash to produce 32 bytes of conditioned output
+        wc_Sha256 sha;
+        wc_InitSha256(&sha);
+        wc_Sha256Update(&sha, noise, in_block);
+        wc_Sha256Final(&sha, digest);
+
+        // Copy as many bytes as needed from digest
+        uint32_t remain = amount - produced;
+        uint32_t take = remain < out_block ? remain : out_block;
+        memcpy(entropy + produced, digest, take);
+        produced += take;
     }
     return (int32_t)amount;
+#else
+    // Raw path: copy words to buffer with continuous test
+    uint32_t produced = 0;
+    while (produced < amount)
+    {
+        // TODO: warmup should be unnecessary, but it doesnt seem to be the case, at least in sims
+        trng_warmup(1);
+        uint32_t w = trng_read_u32();
+        if (w == s_last_entropy_word)
+        {
+            LOGE("GetEntropy fail (equal consecutive 32-bit words): %d", w);
+            return -1; // continuous test failure
+        }
+        s_last_entropy_word = w;
+
+        uint32_t remain = amount - produced;
+        uint32_t take = (remain >= 4) ? 4u : remain;
+        for (uint32_t i = 0; i < take; ++i)
+            entropy[produced + i] = (unsigned char)(w >> (8 * i)); // little-endian
+        produced += take;
+    }
+    return (int32_t)produced;
+#endif
 }
 
 // ---------- LocalityPlat.c ----------

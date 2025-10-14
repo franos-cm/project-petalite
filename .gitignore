@@ -1,6 +1,6 @@
 *venv/
 tools/
-*builds*/
+*build*/
 .Xil/
 .vscode/
 
