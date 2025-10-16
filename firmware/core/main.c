@@ -37,7 +37,6 @@ int main(void)
             }
         }
         // Low-power wait.
-        // TODO: check if this actually works
         asm volatile("wfi");
     }
 }

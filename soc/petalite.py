@@ -64,8 +64,8 @@ class PetaliteCore(SoCCore):
             with_uart=False,
             # Memory specs, considering full TPM firmware
             # Increase SRAM size if we need more heap/stack mem
-            integrated_rom_size=210 * KBYTE,
-            integrated_sram_size=128 * KBYTE,
+            integrated_rom_size=224 * KBYTE,
+            integrated_sram_size=160 * KBYTE,
             integrated_rom_init=integrated_rom_data,
         )
 
@@ -211,10 +211,12 @@ class PetaliteCore(SoCCore):
                 uart_name="sim" if self.is_simulated else "serial",
                 uart_pads=self.platform.request("serial"),
             )
-            # Add io buffers for receiving commands
+            # Add io buffers for TPM commands
+            # NOTE: considering Dilithium signatures can be ~5kB big,
+            #       this IO buffer should be bigger than that.
             self.add_buffer(
                 name="tpm_cmd_buffer",
-                size=4 * KBYTE,
+                size=8 * KBYTE,
                 mode="rw",
                 custom=True,
             )

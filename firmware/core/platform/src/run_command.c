@@ -17,6 +17,8 @@
 //** Includes and locals
 #include "run_command.h"
 #include "transport.h"
+#include "log.h"
+
 jmp_buf s_jumpBuffer;
 
 //** Functions
@@ -45,7 +47,9 @@ LIB_EXPORT NORETURN void _plat__Fail(void)
 
     // Emit marker before assertion so host can parse
     debug_breakpoint(0xFF);
+    LOGE("Platform failed!");
 #ifdef s_failLine
+    LOGE("at line %d", s_failLine);
     debug_breakpoint((UINT8)(s_failLine >> 8));
     debug_breakpoint((UINT8)(s_failLine & 0xFF));
 #else
@@ -53,6 +57,7 @@ LIB_EXPORT NORETURN void _plat__Fail(void)
     debug_breakpoint(0xFF);
 #endif
 #ifdef s_failCode
+    LOGE("and fail code was %d", s_failCode);
     debug_breakpoint((UINT8)(s_failCode >> 8));
     debug_breakpoint((UINT8)(s_failCode & 0xFF));
 #else

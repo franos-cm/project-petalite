@@ -1,0 +1,12 @@
+- We had to extend the max command size to 8kb, since a Dilithium sig can be bigger than 4kB
+
+- Because the sign operation hashes the message with the sk, we need a HashAndSign opcode
+- Because the message can be arbitrarily long, we actually need HashSignStart and HashSignContinue
+
+- Specifically due to the way our core works, its also easier for the Verify op to take the message itself
+- Because of that, ans again the arbitrary size, we need the opcodes HashVerifyStart and HashVerifyContinue
+- If not for our specific core, we could first hash the message/pk with SHAKE to get mu, and then use that to perform the remaining verify step
+
+- For now, lets start with mono commands, without the Sequence logic. Then we can add that.
+
+- We should change, at least the opcode, to be in the vendor commands, even if were not using vendor structures

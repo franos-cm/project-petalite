@@ -2,10 +2,13 @@
 // TODO: replace sections with hardware hooks, and revise behaviour as a whole.
 #include <string.h>
 #include <stdint.h>
+
 #include "platform.h"
 #include "trng.h"
 #include "transport.h"
+#include "dilithium.h"
 #include "log.h"
+
 #if PLAT_ENTROPY_CONDITION_SHA256
 #include <wolfssl/wolfcrypt/sha256.h>
 #endif
@@ -79,6 +82,8 @@ int _plat__Signal_PowerOn(void)
     s_last_entropy_word = 0;
     // Initialize uart and its interrupt service
     transport_irq_init();
+    // Reset Dilithium
+    dilithium_init();
 
     return 0;
 }
@@ -509,3 +514,59 @@ LIB_EXPORT uint32_t _plat__GetTpmType()
     // Common values used by some vendors: discrete(0x00000000), firmware(0x00000001), integrated(0x00000002)
     return 0; // not reported
 }
+
+// ---------- PQC hardware support ----------
+#if ALG_DILITHIUM
+int _plat__Dilithium_KeyGen(uint16_t level,
+                            uint16_t *pk_size, uint8_t *pk_ptr,
+                            uint16_t *sk_size, uint8_t *sk_ptr)
+{
+    // TODO: define error codes instead of sending -1, -2, etc.
+    if (!(pk_size && pk_ptr && sk_size && sk_ptr))
+        return -1;
+
+    // NOTE: buffer needs to be 8 byte aligned, so it works with Litex DMA
+    unsigned char seed[DILITHIUM_SEED_SIZE] __attribute__((aligned(8)));
+    // Get seed for generating keys
+    if (_plat__GetEntropy(seed, DILITHIUM_SEED_SIZE) != (int)DILITHIUM_SEED_SIZE)
+        return -2;
+    // Return generated key
+    int rc = dilithium_keygen((uint8_t)level, seed, pk_size, pk_ptr, sk_size, sk_ptr);
+
+    // wipe seed
+    for (size_t i = 0; i < sizeof(seed); i++)
+        ((volatile uint8_t *)seed)[i] = 0;
+
+    return rc;
+}
+
+int _plat__Dilithium_Sign(uint16_t sk_size, const uint8_t *sk_addr,
+                          uint16_t digest_size, const uint8_t *digest,
+                          uint16_t *sig_size, uint8_t *sig)
+{
+    // TODO: wire to HW/driver; dummy stub for now
+    (void)sk_size;
+    (void)sk_addr;
+    (void)digest_size;
+    (void)digest;
+    (void)sig_size;
+    (void)sig;
+    return -1;
+}
+
+int _plat__Dilithium_Verify(uint16_t pk_size, const uint8_t *pk_addr,
+                            uint16_t digest_size, const uint8_t *digest,
+                            uint16_t sig_size, const uint8_t *sig,
+                            int *verified)
+{
+    // TODO: wire to HW/driver; dummy stub for now
+    (void)pk_size;
+    (void)pk_addr;
+    (void)digest_size;
+    (void)digest;
+    (void)sig_size;
+    (void)sig;
+    (void)verified;
+    return -1;
+}
+#endif

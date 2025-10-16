@@ -62,7 +62,7 @@ class TpmTester:
         return result
 
     def create_primary_cmd(self):
-        create_primary_cmd = (
+        bytestring = (
             # =========== Header ===========
             "80 02"  # ST_SESSIONS
             "00 00 00 45"  # Command size
@@ -92,9 +92,9 @@ class TpmTester:
             "00 00 00 00"
         )
 
-        create_primary_bytestream = bytes.fromhex(create_primary_cmd.replace(" ", ""))
+        bytestream = bytes.fromhex(bytestring.replace(" ", ""))
         print("Sending create_primary() command...")
-        self.uart.send_bytes(create_primary_bytestream)
+        self.uart.send_bytes(bytestream)
 
         print("Waiting for create_primary() answer...")
         self.wait_for_ready_signal()
@@ -103,6 +103,57 @@ class TpmTester:
         if not result:
             raise RuntimeError("Failed to get create_primary() answer, aborting")
         print("create_primary() response:\n", " ".join(f"{b:02X}" for b in result))
+        return result
+
+    def create_primary_dilithium_cmd(self):
+        # TPM2_CreatePrimary with Dilithium L2
+        bytestring = (
+            # ===== Header =====
+            "80 02"              # TPM_ST_SESSIONS
+            "00 00 00 41"        # command size = 63 bytes
+            "00 00 01 31"        # TPM_CC_CreatePrimary
+            # ===== Handle =====
+            "40 00 00 01"        # TPM_RH_OWNER
+            # ===== AuthArea =====
+            "00 00 00 09"        # authArea size = 9
+            "40 00 00 09"        # TPM_RS_PW
+            "00 00"              # nonce size = 0
+            "00"                 # session attributes
+            "00 00"              # hmac size = 0 (empty owner auth)
+            # ===== inSensitive (TPM2B_SENSITIVE_CREATE) =====
+            "00 08"              # total size = 8
+            "00 04"              # userAuth size = 4
+            "61 62 63 64"        # "abcd"
+            "00 00"              # sensitive.data size = 0
+            # ===== inPublic (TPM2B_PUBLIC) =====
+            "00 14"              # TPMT_PUBLIC size = 20
+            "00 72"              # type = TPM_ALG_DILITHIUM (0x0072)
+            "00 0B"              # nameAlg = TPM_ALG_SHA256 (0x000B)
+            "00 04 04 72"        # objectAttributes = 0x00040472
+            "00 00"              # authPolicy size = 0
+            # ----- TPMS_DILITHIUM_PARMS -----
+            "00 10"              # parameters.symmetric.algorithm = TPM_ALG_NULL
+            "00 10"              # parameters.scheme.scheme = TPM_ALG_NULL
+            "00 02"              # securityLevel = 2
+            "00 0B"              # nameHashAlg = TPM_ALG_SHA256
+            # ----- unique -----
+            "00 00"              # unique (TPM2B) size = 0
+            # ===== outsideInfo =====
+            "00 00"
+            # ===== creationPCR =====
+            "00 00 00 00"
+        )
+        bytestream = bytes.fromhex(bytestring.replace(" ", ""))
+        print("Sending create_primary_dilithium() command...")
+        self.uart.send_bytes(bytestream)
+
+        print("Waiting for create_primary_dilithium() answer...")
+        self.wait_for_ready_signal()
+        result = self.read_tpm_response(timeout=3600)
+
+        if not result:
+            raise RuntimeError("Failed to get create_primary_dilithium() answer, aborting")
+        print("create_primary_dilithium() response:\n", " ".join(f"{b:02X}" for b in result))
         return result
 
     def compare(self, name, expected, received, res_list):
@@ -172,7 +223,15 @@ class TpmTester:
                 continue
 
             if cmd == "create_primary":
-                self.create_primary_cmd()
+                try:
+                    algo = int(input("ECC (1) or Dilithium (2)? [1] ").strip() or "1")
+                except Exception:
+                    algo = 1
+
+                if algo == 1:
+                    self.create_primary_cmd()
+                elif algo == 2:
+                    self.create_primary_dilithium_cmd()
                 continue
 
             print("Unknown command. Type 'help'.")
