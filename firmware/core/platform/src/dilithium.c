@@ -111,10 +111,10 @@ static inline uint32_t get_sk_len(uint8_t lvl)
         DILITHIUM_RHO_SIZE + DILITHIUM_K_SIZE + DILITHIUM_TR_SIZE + get_s1_len(lvl) + get_s2_len(lvl) + get_t0_len(lvl));
 }
 
-static void dilithium_setup(uint8_t op, uint16_t sec_level)
+static void dilithium_setup(uint8_t op, uint8_t sec_level)
 {
-    dilithium_mode_write(op);
-    dilithium_security_level_write(sec_level);
+    dilithium_mode_write((uint32_t) op);
+    dilithium_security_level_write((uint32_t) sec_level);
 }
 
 static void dilithium_start(void)
@@ -194,18 +194,17 @@ static void dilithium_write_wait(void)
         ;
 }
 
-// keypair_ptr points to the DMA scratch laid out (64b aligned) as:
+// keypair points to the DMA scratch laid out (64b aligned) as:
 //   Rho | K | S1 | S2 | T1 | T0 | TR
-// We repack into:
-//   pk = (Rho, T1)
-//   sk = (Rho, K, TR, S1, S2, T0)
-static uint32_t package_keypair(uint8_t  sec_level,
-                           uint8_t *keypair_ptr,
-                           uint16_t *pk_size, uint8_t *pk_ptr,
-                           uint16_t *sk_size, uint8_t *sk_ptr)
+// We repack into (not 64b aligned):
+//   pk = (Rho | T1), sk = (Rho | K | TR | S1 | S2 | T0)
+static uint32_t pack_keypair(uint8_t sec_level,
+                             uint8_t *keypair_addr,
+                             uint8_t *pk, uint16_t *pk_size,
+                             uint8_t *sk, uint16_t *sk_size)
 {
     // Args checks
-    if (!keypair_ptr || !pk_size || !pk_ptr || !sk_size || !sk_ptr) return -1;
+    if (!keypair_addr || !pk_size || !pk || !sk_size || !sk) return -1;
 
     // Useful lengths
     const uint32_t s1_len = get_s1_len(sec_level);
@@ -221,7 +220,7 @@ static uint32_t package_keypair(uint8_t  sec_level,
     if ((uint16_t)sk_len > *sk_size) return -3;
 
     // Producer (DMA scratch) layout — 64-bit aligned segments
-    uint8_t *rho = keypair_ptr;
+    uint8_t *rho = keypair_addr;
     uint8_t *k   = rho + align8(DILITHIUM_RHO_SIZE);
     uint8_t *s1  = k   + align8(DILITHIUM_K_SIZE);
     uint8_t *s2  = s1  + align8((size_t)s1_len);
@@ -239,18 +238,52 @@ static uint32_t package_keypair(uint8_t  sec_level,
     const size_t t1_off  = rho_off + DILITHIUM_RHO_SIZE;
 
     // sk = (rho, K, TR, S1, S2, T0)
-    memcpy(sk_ptr + rho_off, rho, DILITHIUM_RHO_SIZE);
-    memcpy(sk_ptr + k_off,   k,   DILITHIUM_K_SIZE);
-    memcpy(sk_ptr + tr_off,  tr,  DILITHIUM_TR_SIZE);
-    memcpy(sk_ptr + s1_off,  s1,  (size_t)s1_len);
-    memcpy(sk_ptr + s2_off,  s2,  (size_t)s2_len);
-    memcpy(sk_ptr + t0_off,  t0,  (size_t)t0_len);
+    memcpy(sk + rho_off, rho, DILITHIUM_RHO_SIZE);
+    memcpy(sk + k_off,   k,   DILITHIUM_K_SIZE);
+    memcpy(sk + tr_off,  tr,  DILITHIUM_TR_SIZE);
+    memcpy(sk + s1_off,  s1,  (size_t)s1_len);
+    memcpy(sk + s2_off,  s2,  (size_t)s2_len);
+    memcpy(sk + t0_off,  t0,  (size_t)t0_len);
     *sk_size = (uint16_t)sk_len;
 
     // pk = (rho, T1)
-    memcpy(pk_ptr + rho_off, rho, DILITHIUM_RHO_SIZE);
-    memcpy(pk_ptr + t1_off,  t1,  (size_t)t1_len);
+    memcpy(pk + rho_off, rho, DILITHIUM_RHO_SIZE);
+    memcpy(pk + t1_off,  t1,  (size_t)t1_len);
     *pk_size = (uint16_t)pk_len;
+
+    return 0;
+}
+
+
+// sig_addr points to the DMA scratch laid out (64b aligned) as:
+//   z | h | c
+// We repack into (not 64b aligned):
+//   sig = (c | z | h)
+static uint32_t pack_sig(uint8_t sec_level, uint8_t *sig_addr,
+                         uint8_t *packed_sig, uint16_t *packed_sig_size)
+{
+    // Useful lengths
+    const uint32_t z_len = get_z_len(sec_level);
+    const uint32_t h_len = get_h_len(sec_level);
+    const uint32_t sig_len = DILITHIUM_C_SIZE + z_len + h_len;
+    // Length checks
+    if (z_len <= 0 || h_len <= 0) return -1;
+
+    // Producer (DMA scratch) layout — 64-bit aligned segments
+    uint8_t *z = sig_addr;
+    uint8_t *h = z + align8(z_len);
+    uint8_t *c = h + align8(h_len);
+
+    // Offsets within packed outputs
+    const size_t c_off = 0;
+    const size_t z_off  = c_off + DILITHIUM_C_SIZE;
+    const size_t h_off  = z_off + (size_t)z_len;
+
+    // sk = (rho, K, TR, S1, S2, T0)
+    memcpy(packed_sig + c_off, c, DILITHIUM_C_SIZE);
+    memcpy(packed_sig + z_off, z, (size_t)z_len);
+    memcpy(packed_sig + h_off, h, (size_t)h_len);
+    *packed_sig_size = (uint16_t)sig_len;
 
     return 0;
 }
@@ -261,14 +294,14 @@ void dilithium_init(void)
     dilithium_reset();
 }
 
-// NOTE: both seed_ptr and keypair_ptr should be 64 bit aligned
-uint32_t dilithium_keygen(uint8_t  sec_level, const uint8_t *seed_ptr,
-                          uint16_t *pk_size, uint8_t *pk_ptr,      // capacity in, size out
-                          uint16_t *sk_size, uint8_t *sk_ptr)      // capacity in, size out
+// NOTE: seed should be 64 bit aligned
+uint32_t dilithium_keygen(uint8_t sec_level, const uint8_t *seed,
+                          uint8_t *pk, uint16_t *pk_size,
+                          uint8_t *sk, uint16_t *sk_size)
 {
-    LOGD("Starting keygen...");
+    LOGD("Starting Keygen op...");
     // NOTE: both pk and sk have Rho, but it is only output once by the module, so we subtract it
-    uint8_t *keypair_ptr = _dilithium_buffer_start;
+    uint8_t *keypair_addr = _dilithium_buffer_start;
     uint32_t keypair_size = get_pk_len(sec_level) + get_sk_len(sec_level) - DILITHIUM_RHO_SIZE;
 
     // Set Dilithium
@@ -276,19 +309,133 @@ uint32_t dilithium_keygen(uint8_t  sec_level, const uint8_t *seed_ptr,
 	dilithium_setup(DILITHIUM_CMD_KEYGEN, sec_level);
 
     // Setup Dilithium DMA
-    dilithium_write_setup(keypair_ptr, (uint32_t)keypair_size);
+    dilithium_write_setup(keypair_addr, (uint32_t)keypair_size);
     dilithium_write_start();
-    dilithium_read_setup(seed_ptr, (uint32_t)DILITHIUM_SEED_SIZE);
+    dilithium_read_setup(seed, (uint32_t)DILITHIUM_SEED_SIZE);
     dilithium_read_start();
 
     // Start dilithium core and wait for it to finish responding
-    LOGD("Starting dilithium core...");
     dilithium_start();
-    // Wait for Dilithium to finish
-    LOGD("Waiting for dilithium core...");
     dilithium_read_wait();
     dilithium_write_wait();
 
     LOGD("Keygen done!");
-    return package_keypair(sec_level, keypair_ptr, pk_size, pk_ptr, sk_size, sk_ptr);
+    return pack_keypair(sec_level, keypair_addr, pk, pk_size, sk, sk_size);
+}
+
+
+uint32_t dilithium_sign_start(uint8_t sec_level, uint32_t message_size,
+                              const uint8_t *sk, uint16_t sk_size)
+{
+    LOGD("Starting Sign Start op...");
+    (void)sk_size; // Unecessary arg
+    // For the first part of the sign operation, we just feed the core part of the sk
+    // This is due to the specific order in which the core ingests the data.
+    // Our sk is packaged as (rho | K | TR | S1 | S2 | T0), and we first need (rho | TR)
+    const uint8_t *rho = sk;
+    const uint8_t *tr = rho + DILITHIUM_RHO_SIZE + DILITHIUM_K_SIZE;
+    // mlen is required by the core to be a 64-bit big-endian
+    uint64_t mlen = __builtin_bswap64((uint64_t)message_size);
+
+    // Write 64-bit aligned values to scratchpad
+    uint8_t *input_payload_addr = _dilithium_buffer_start;
+    const size_t rho_off = 0;
+    const size_t mlen_off = rho_off + align8(DILITHIUM_RHO_SIZE);
+    const size_t tr_off = mlen_off + align8(DILITHIUM_CORE_MLEN_SIZE);
+    memcpy(input_payload_addr + rho_off, rho, DILITHIUM_RHO_SIZE);
+    memcpy(input_payload_addr + mlen_off, &mlen, DILITHIUM_CORE_MLEN_SIZE);
+    memcpy(input_payload_addr + tr_off, tr, DILITHIUM_TR_SIZE);
+
+    // Ready Dilithium
+    dilithium_reset();
+	dilithium_setup(DILITHIUM_CMD_SIGN, sec_level);
+
+    // DMA setup: we dont need to have Dilithium write to memory yet
+    // since in the specific case of our core, the result is stored in a private buffer.
+    // But we could already start it, depending on the latency.
+    const size_t payload_size = tr_off + align8(DILITHIUM_TR_SIZE);
+    dilithium_read_setup(input_payload_addr, payload_size);
+    dilithium_read_start();
+
+    // Start dilithium core, and we dont need to wait for it to finish reading (for now)
+    // TODO: maybe we should wait for the read to finish, and then erase the sk from the buffer.
+    //       I think this would be mostly done as a precaution, but in practice, sk already exists elsewhere...
+    dilithium_start();
+
+    LOGD("Sign Start done!");
+    return 0;
+}
+
+// NOTE: msg_chunk should be 64 bit aligned
+uint32_t dilithium_sign_update(const uint8_t* msg_chunk, uint16_t msg_chunk_size)
+{
+    LOGD("Starting Sign Update op...");
+    // Wait for previous dilithium op to end, assuming it hasnt
+    LOGD("Waiting for previous msg ingestion to finish...");
+    dilithium_read_wait();
+    // Feed message chunk into Dilithium core
+    dilithium_read_setup(msg_chunk, msg_chunk_size);
+    dilithium_read_start();
+
+    LOGD("Sign Update done!");
+    return 0;
+}
+
+
+uint32_t dilithium_sign_finish(uint8_t sec_level,
+                               const uint8_t* sk, uint16_t sk_size,
+                               uint8_t* sig, uint16_t* sig_size)
+{
+    LOGD("Starting Sign Finish op...");
+    (void)sk_size; // Unecessary arg
+    // For the last part of the sign operation, we just feed the core the rest of the sk
+    // Again, our sk is packaged as (rho | K | TR | S1 | S2 | T0), and we now need (K | S1 | S2 | T0)
+    const uint32_t s1_len = get_s1_len(sec_level);
+    const uint32_t s2_len = get_s2_len(sec_level);
+    const uint32_t t0_len = get_t0_len(sec_level);
+    const uint32_t sig_len = get_sig_len(sec_level);
+    // Capacity checks (*size is capacity on input).
+    if ((uint16_t)sig_len > *sig_size) return -2;
+
+    const uint8_t *k = sk + DILITHIUM_RHO_SIZE;
+    const uint8_t *s1 = k + DILITHIUM_K_SIZE + DILITHIUM_TR_SIZE;
+    const uint8_t *s2 = s1 + s1_len;
+    const uint8_t *t0 = s2 + s2_len;
+
+    // Write 64-bit aligned values to scratchpad
+    uint8_t *input_payload_addr = _dilithium_buffer_start;
+    const size_t k_off = 0;
+    const size_t s1_off = k_off + align8(DILITHIUM_K_SIZE);
+    const size_t s2_off = s1_off + align8(s1_len);
+    const size_t t0_off = s2_off + align8(s2_len);
+    const size_t input_payload_size = t0_off + align8(t0_len);
+
+    // Prepare sig to be also written onto scratchpad
+    uint8_t *output_payload_addr = _dilithium_buffer_start + input_payload_size;
+    dilithium_write_setup(output_payload_addr, sig_len);
+    dilithium_write_start();
+
+    // Copy input payload onto positions
+    memcpy(input_payload_addr + k_off, k, DILITHIUM_K_SIZE);
+    memcpy(input_payload_addr + s1_off, s1, s1_len);
+    memcpy(input_payload_addr + s2_off, s2, s2_len);
+    memcpy(input_payload_addr + t0_off, t0, t0_len);
+
+    // Wait for previous dilithium op to end, assuming it hasnt
+    LOGD("Waiting for last message ingestion to finish...");
+    dilithium_read_wait();
+    // Read the rest of the sk into the dilithium core
+    dilithium_read_setup(input_payload_addr, input_payload_size);
+    dilithium_read_start();
+
+    // Wait for both reading to end
+    dilithium_read_wait();
+    // Once reading is finished, we can start wiping the sk off the scratch buffer
+    for (size_t i = 0; i < input_payload_size; i++)
+        ((volatile uint8_t *)input_payload_addr)[i] = 0;
+    // Then wait for writing to end, if it hasnt
+    dilithium_write_wait();
+
+    LOGD("Sign Finish done!");
+    return pack_sig(sec_level, output_payload_addr, sig, sig_size);
 }

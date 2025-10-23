@@ -48,21 +48,16 @@ LIB_EXPORT NORETURN void _plat__Fail(void)
     // Emit marker before assertion so host can parse
     debug_breakpoint(0xFF);
     LOGE("Platform failed!");
-#ifdef s_failLine
-    LOGE("at line %d", s_failLine);
-    debug_breakpoint((UINT8)(s_failLine >> 8));
-    debug_breakpoint((UINT8)(s_failLine & 0xFF));
+#if FAIL_TRACE
+    extern const char *s_failFunctionName;
+    extern UINT32 s_failLine;
+    extern UINT32 s_failCode;
+    LOGE("at %s:%u", s_failFunctionName ? s_failFunctionName : "(unknown)", s_failLine);
+    LOGE("fail code %u (0x%08X)", s_failCode, s_failCode);
 #else
-    debug_breakpoint(0x00);
-    debug_breakpoint(0xFF);
-#endif
-#ifdef s_failCode
-    LOGE("and fail code was %d", s_failCode);
-    debug_breakpoint((UINT8)(s_failCode >> 8));
-    debug_breakpoint((UINT8)(s_failCode & 0xFF));
-#else
-    debug_breakpoint(0x00);
-    debug_breakpoint(0xFF);
+    extern UINT32 s_failLine;
+    extern UINT32 s_failCode;
+    LOGE("line %u, fail code %u (0x%08X)", s_failLine, s_failCode, s_failCode);
 #endif
 
 #if ALLOW_FORCE_FAILURE_MODE

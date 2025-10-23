@@ -5,7 +5,11 @@
 #include <generated/csr.h>
 
 // NOTE: start of any read or write from dilithium must be 64 bit aligned.
-// TODO: check that that is the case
+//       To account for that, we first do memcpy from the data's original location
+//       to the aligned buffers that will be referenced in the args (such as pk).
+//       Ideally we wouldnt have to do this, since it increases both latency and mem usage.
+//       To avoid it, we should change the DMA core to allow unaligned accesses, which is
+//       completely doable, but requires more extensive testing than this simply strategy.
 
 #define DILITHIUM_H_LVL2_SIZE 84
 #define DILITHIUM_H_LVL3_SIZE 61
@@ -36,12 +40,20 @@
 #define DILITHIUM_RHO_SIZE 32
 #define DILITHIUM_TR_SIZE 32
 #define DILITHIUM_C_SIZE 32
+#define DILITHIUM_CORE_MLEN_SIZE 8
 
 #define DILITHIUM_CMD_KEYGEN 0
 #define DILITHIUM_CMD_VERIFY 1
 #define DILITHIUM_CMD_SIGN 2
 
 void dilithium_init(void);
-uint32_t dilithium_keygen(uint8_t sec_level, const uint8_t *seed_ptr,
-                          uint16_t *pk_size, uint8_t *pk_ptr,
-                          uint16_t *sk_size, uint8_t *sk_ptr);
+uint32_t dilithium_keygen(uint8_t sec_level,
+                          const uint8_t *seed,
+                          uint8_t *pk, uint16_t *pk_size,
+                          uint8_t *sk, uint16_t *sk_size);
+uint32_t dilithium_sign_start(uint8_t sec_level, uint32_t message_size,
+                              const uint8_t *sk, uint16_t sk_size);
+uint32_t dilithium_sign_update(const uint8_t *msg_chunk, uint16_t msg_chunk_size);
+uint32_t dilithium_sign_finish(uint8_t sec_level,
+                               const uint8_t *sk, uint16_t sk_size,
+                               uint8_t *sig, uint16_t *sig_size);

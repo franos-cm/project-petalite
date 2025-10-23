@@ -35,11 +35,11 @@ class PetaliteCore(SoCCore):
         self.comm_protocol = comm_protocol
         self.setup_buffer_allocator()
 
-        # In theory, we could pass the integrated_rom_init to the SoC intiializer
-        # In practice, there is a bug by which if you do that, the size of the ROM is incorrectly calculated
-        # So for now we pass the integrated_rom_init as a list of the instructions, but we should do a Litex PR for that
-        # For that, we need do know the data_width and endianness of the CPU a priori, which is fine,
-        # as long as we remember to change it if we switch CPUs
+        # NOTE: In theory, we could pass the integrated_rom_init param to the SoC intiializer
+        #       In practice, there is a bug by which if you do that, the size of the ROM is incorrectly calculated
+        #       So for now we pass the integrated_rom_init as a list of the instructions, which makes it work.
+        #       For that, we need do know the data_width and endianness of the CPU a priori, which is fine,
+        #       as long as we remember to change it if we switch CPUs
         integrated_rom_data = (
             get_mem_data(
                 integrated_rom_path, data_width=self.bus_data_width, endianness="little"
@@ -63,9 +63,8 @@ class PetaliteCore(SoCCore):
             # Communication
             with_uart=False,
             # Memory specs, considering full TPM firmware
-            # Increase SRAM size if we need more heap/stack mem
             integrated_rom_size=224 * KBYTE,
-            integrated_sram_size=160 * KBYTE,
+            integrated_sram_size=160 * KBYTE, # Increase SRAM size if we need more heap/stack mem
             integrated_rom_init=integrated_rom_data,
         )
 
@@ -197,7 +196,7 @@ class PetaliteCore(SoCCore):
     def add_io(self):
         if self.comm_protocol == CommProtocol.UART:
             if self.is_simulated:
-                # If we are simulating, we can have a UARt for interacting with the terminal
+                # If we are simulating, we can have a UART for interacting with the terminal
                 # NOTE: this one needs to be named uart so we can use Litex stdio
                 self.add_uart(
                     name="uart",
@@ -260,15 +259,19 @@ class PetaliteCore(SoCCore):
             self.dilithium.source.connect(self.dilithium_writer.sink),
         ]
 
-        # Add memory region for sig and pk
+        # Add scratch memory region for the core's input and output
         # TODO: check this IO region stuff later
         # NOTE: this puts the buffer inside of IO region
-        # I guess thats not ideal... but otherwise, the CPU was unable
-        # to access the given mem position, like 0x83000000.
-        # We also had to add an extra param to the add_ram method to account for that.
+        #       I guess thats not ideal... but otherwise, the CPU wasnt
+        #       able to access the given mem position, like 0x83000000.
+        #       We also had to add an extra param to the add_ram method to account for that.
+        # NOTE: the size of this buffer is defined by the max length of input and output data
+        #       that can exist simultaneously in the buffer during an op. At the moment, that is during
+        #       the sign op, in which we need to load part of the sk into the buffer to guarantee 8B alignment.
+        #       If we fix the DMA engine so it doesnt need 8B alignment, we can probably make it smaller.
         self.add_buffer(
             name="dilithium_buffer",
-            size=10 * KBYTE,  # NOTE: 10 kB for sim, but final design could have 8 kB
+            size=10 * KBYTE,
             mode="rw",
             custom=True,
         )

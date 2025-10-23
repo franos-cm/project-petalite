@@ -2,20 +2,14 @@ import time
 import socket
 import threading
 import queue
-
 try:
     import serial  # (optional when using TCP only)
 except Exception:
     serial = None
 
-from utils import (
-    DILITHIUM_ACK_BYTE,
-    DILITHIUM_READY_BYTE,
-    DILITHIUM_SYNC_BYTE,
-    DILITHIUM_START_BYTE,
-    BASE_ACK_GROUP_LENGTH,
-)
 
+DILITHIUM_READY_BYTE = 0xA0
+BASE_ACK_GROUP_LENGTH = 64
 
 class _SocketTransport:
     def __init__(self, sock: socket.socket):
@@ -371,20 +365,6 @@ class UARTConnection:
 
         return bytes(buffer) if buffer else None
 
-    def wait_for_ack(self, timeout=120):
-        return self._wait_for_byte(
-            expected_byte=DILITHIUM_ACK_BYTE, signal_name="ACK", timeout=timeout
-        )
-
-    def wait_for_ready(self, timeout=120):
-        return self._wait_for_byte(
-            expected_byte=DILITHIUM_READY_BYTE, signal_name="READY", timeout=timeout
-        )
-
-    def wait_for_start(self, timeout=120):
-        return self._wait_for_byte(
-            expected_byte=DILITHIUM_START_BYTE, signal_name="START", timeout=timeout
-        )
 
     def get_response_header(self, timeout=1200):
         self.wait_for_start()
@@ -392,18 +372,6 @@ class UARTConnection:
         response_header = self.wait_for_bytes(num_bytes=4, timeout=timeout)
         self.send_ack()
         return response_header
-
-    def send_ack(self):
-        self._console("[ACK] Sending ACK...")
-        self.send_bytes(DILITHIUM_ACK_BYTE)
-
-    def send_sync(self):
-        self._console("[SYNC] Sending SYNC...")
-        self.send_bytes(DILITHIUM_SYNC_BYTE)
-
-    def send_start(self):
-        self._console("[START] Sending START...")
-        self.send_bytes(DILITHIUM_START_BYTE)
 
     def send_in_chunks(
         self,

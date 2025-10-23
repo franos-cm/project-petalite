@@ -517,21 +517,27 @@ LIB_EXPORT uint32_t _plat__GetTpmType()
 
 // ---------- PQC hardware support ----------
 #if ALG_DILITHIUM
-int _plat__Dilithium_KeyGen(uint16_t level,
-                            uint16_t *pk_size, uint8_t *pk_ptr,
-                            uint16_t *sk_size, uint8_t *sk_ptr)
+
+// Buffer that is 64 bit aligned
+// TODO: we shouldnt need this if our DMA could do unaligned accesses.
+// NOTE: its size is currently defined by the max length of a message chunk, considering an 8 kB buffer
+unsigned char dilithium_aligned_buffer[8176] __attribute__((aligned(8)));
+
+uint32_t _plat__Dilithium_KeyGen(uint8_t sec_level,
+                                 uint8_t *pk, uint16_t *pk_size,
+                                 uint8_t *sk, uint16_t *sk_size)
 {
     // TODO: define error codes instead of sending -1, -2, etc.
-    if (!(pk_size && pk_ptr && sk_size && sk_ptr))
+    if (!(pk_size && pk && sk_size && sk))
         return -1;
 
     // NOTE: buffer needs to be 8 byte aligned, so it works with Litex DMA
-    unsigned char seed[DILITHIUM_SEED_SIZE] __attribute__((aligned(8)));
+    uint8_t *seed = dilithium_aligned_buffer;
     // Get seed for generating keys
     if (_plat__GetEntropy(seed, DILITHIUM_SEED_SIZE) != (int)DILITHIUM_SEED_SIZE)
         return -2;
-    // Return generated key
-    int rc = dilithium_keygen((uint8_t)level, seed, pk_size, pk_ptr, sk_size, sk_ptr);
+    // Generate keypair
+    uint32_t rc = dilithium_keygen(sec_level, seed, pk, pk_size, sk, sk_size);
 
     // wipe seed
     for (size_t i = 0; i < sizeof(seed); i++)
@@ -540,33 +546,42 @@ int _plat__Dilithium_KeyGen(uint16_t level,
     return rc;
 }
 
-int _plat__Dilithium_Sign(uint16_t sk_size, const uint8_t *sk_addr,
-                          uint16_t digest_size, const uint8_t *digest,
-                          uint16_t *sig_size, uint8_t *sig)
+
+uint32_t _plat__Dilithium_HashSignStart(uint8_t sec_level, uint32_t message_size,
+                                        const uint8_t* sk, uint16_t sk_size,
+                                        uint32_t* ctx_id)
 {
-    // TODO: wire to HW/driver; dummy stub for now
-    (void)sk_size;
-    (void)sk_addr;
-    (void)digest_size;
-    (void)digest;
-    (void)sig_size;
-    (void)sig;
-    return -1;
+    if (!(sk_size && sk))
+        return -1;
+
+    *ctx_id = 1; // constant token, since our hardware only supports a single op at a time (single session)
+    return dilithium_sign_start(sec_level, message_size, sk, sk_size);
 }
 
-int _plat__Dilithium_Verify(uint16_t pk_size, const uint8_t *pk_addr,
-                            uint16_t digest_size, const uint8_t *digest,
-                            uint16_t sig_size, const uint8_t *sig,
-                            int *verified)
+// Stream message chunks to hardware
+uint32_t _plat__Dilithium_HashSignUpdate(uint32_t ctx_id,
+                                         const uint8_t* chunk,
+                                         uint16_t chunk_size)
 {
-    // TODO: wire to HW/driver; dummy stub for now
-    (void)pk_size;
-    (void)pk_addr;
-    (void)digest_size;
-    (void)digest;
-    (void)sig_size;
-    (void)sig;
-    (void)verified;
-    return -1;
+    (void)ctx_id; // single-session hardware
+    if (!(chunk_size && chunk))
+        return -1;
+
+    // NOTE: message needs to be 8 byte aligned, so it works with Litex DMA
+    uint8_t *msg_buffer = dilithium_aligned_buffer;
+    memcpy(msg_buffer, chunk, chunk_size);
+    return dilithium_sign_update(msg_buffer, chunk_size);
 }
+
+// Finish: platform ingests SK-partB and produces the signature
+uint32_t _plat__Dilithium_HashSignFinish(uint32_t ctx_id, uint8_t sec_level,
+                                         const uint8_t* sk, uint16_t sk_size,
+                                         uint8_t* sig, uint16_t* sig_size)
+{
+    (void)ctx_id; // single-session hardware
+    if (!(sk && sk_size && sig && sig_size))
+        return -1;
+    return dilithium_sign_finish(sec_level, sk, sk_size, sig, sig_size);
+}
+
 #endif
