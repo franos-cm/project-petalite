@@ -2,6 +2,7 @@ import time
 import socket
 import threading
 import queue
+
 try:
     import serial  # (optional when using TCP only)
 except Exception:
@@ -10,6 +11,7 @@ except Exception:
 
 DILITHIUM_READY_BYTE = 0xA0
 BASE_ACK_GROUP_LENGTH = 64
+
 
 class _SocketTransport:
     def __init__(self, sock: socket.socket):
@@ -365,13 +367,10 @@ class UARTConnection:
 
         return bytes(buffer) if buffer else None
 
-
-    def get_response_header(self, timeout=1200):
-        self.wait_for_start()
-        self.send_ack()
-        response_header = self.wait_for_bytes(num_bytes=4, timeout=timeout)
-        self.send_ack()
-        return response_header
+    def wait_for_ready(self, timeout=120):
+        return self._wait_for_byte(
+            expected_byte=DILITHIUM_READY_BYTE, signal_name="READY", timeout=timeout
+        )
 
     def send_in_chunks(
         self,
