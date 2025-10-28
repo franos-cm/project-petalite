@@ -3,6 +3,7 @@
 #include <stdbool.h>
 #include <string.h>
 #include <generated/csr.h>
+#include <generated/soc.h>
 
 // NOTE: start of any read or write from dilithium must be 64 bit aligned.
 //       To account for that, we first do memcpy from the data's original location
@@ -10,6 +11,7 @@
 //       Ideally we wouldnt have to do this, since it increases both latency and mem usage.
 //       To avoid it, we should change the DMA core to allow unaligned accesses, which is
 //       completely doable, but requires more extensive testing than this simply strategy.
+// NOTE: we probably could get rid of the dilithium_buffer and just deal with arrays in the firmware itself.
 
 #define DILITHIUM_H_LVL2_SIZE 84
 #define DILITHIUM_H_LVL3_SIZE 61
@@ -46,14 +48,20 @@
 #define DILITHIUM_CMD_VERIFY 1
 #define DILITHIUM_CMD_SIGN 2
 
+uint32_t get_h_len(uint8_t lvl);
+uint32_t get_z_len(uint8_t lvl);
 void dilithium_init(void);
+uint32_t dilithium_update(const uint8_t *msg_chunk, uint16_t msg_chunk_size);
 uint32_t dilithium_keygen(uint8_t sec_level,
                           const uint8_t *seed,
                           uint8_t *pk, uint16_t *pk_size,
                           uint8_t *sk, uint16_t *sk_size);
 uint32_t dilithium_sign_start(uint8_t sec_level, uint32_t message_size,
                               const uint8_t *sk, uint16_t sk_size);
-uint32_t dilithium_sign_update(const uint8_t *msg_chunk, uint16_t msg_chunk_size);
 uint32_t dilithium_sign_finish(uint8_t sec_level,
                                const uint8_t *sk, uint16_t sk_size,
                                uint8_t *sig, uint16_t *sig_size);
+uint32_t dilithium_verify_start(uint8_t sec_level, uint32_t message_size,
+                                const uint8_t *pk, uint16_t pk_size,
+                                const uint8_t *sig, uint16_t sig_size);
+uint32_t dilithium_verify_finish(uint8_t sec_level, const uint8_t *h, uint16_t h_size, bool *accepted);

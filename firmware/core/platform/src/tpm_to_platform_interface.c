@@ -523,6 +523,21 @@ LIB_EXPORT uint32_t _plat__GetTpmType()
 // NOTE: its size is currently defined by the max length of a message chunk, considering an 8 kB buffer
 unsigned char dilithium_aligned_buffer[8176] __attribute__((aligned(8)));
 
+// Stream message chunks to hardware
+uint32_t _plat__Dilithium_Update(uint32_t ctx_id,
+                                 const uint8_t *chunk,
+                                 uint16_t chunk_size)
+{
+    (void)ctx_id; // single-session hardware
+    if (!(chunk_size && chunk))
+        return -1;
+
+    // NOTE: message needs to be 8 byte aligned, so it works with Litex DMA
+    uint8_t *msg_buffer = dilithium_aligned_buffer;
+    memcpy(msg_buffer, chunk, chunk_size);
+    return dilithium_update(msg_buffer, chunk_size);
+}
+
 uint32_t _plat__Dilithium_KeyGen(uint8_t sec_level,
                                  uint8_t *pk, uint16_t *pk_size,
                                  uint8_t *sk, uint16_t *sk_size)
@@ -546,10 +561,9 @@ uint32_t _plat__Dilithium_KeyGen(uint8_t sec_level,
     return rc;
 }
 
-
 uint32_t _plat__Dilithium_HashSignStart(uint8_t sec_level, uint32_t message_size,
-                                        const uint8_t* sk, uint16_t sk_size,
-                                        uint32_t* ctx_id)
+                                        const uint8_t *sk, uint16_t sk_size,
+                                        uint32_t *ctx_id)
 {
     if (!(sk_size && sk))
         return -1;
@@ -558,30 +572,57 @@ uint32_t _plat__Dilithium_HashSignStart(uint8_t sec_level, uint32_t message_size
     return dilithium_sign_start(sec_level, message_size, sk, sk_size);
 }
 
-// Stream message chunks to hardware
-uint32_t _plat__Dilithium_HashSignUpdate(uint32_t ctx_id,
-                                         const uint8_t* chunk,
-                                         uint16_t chunk_size)
-{
-    (void)ctx_id; // single-session hardware
-    if (!(chunk_size && chunk))
-        return -1;
-
-    // NOTE: message needs to be 8 byte aligned, so it works with Litex DMA
-    uint8_t *msg_buffer = dilithium_aligned_buffer;
-    memcpy(msg_buffer, chunk, chunk_size);
-    return dilithium_sign_update(msg_buffer, chunk_size);
-}
-
 // Finish: platform ingests SK-partB and produces the signature
 uint32_t _plat__Dilithium_HashSignFinish(uint32_t ctx_id, uint8_t sec_level,
-                                         const uint8_t* sk, uint16_t sk_size,
-                                         uint8_t* sig, uint16_t* sig_size)
+                                         const uint8_t *sk, uint16_t sk_size,
+                                         uint8_t *sig, uint16_t *sig_size)
 {
     (void)ctx_id; // single-session hardware
     if (!(sk && sk_size && sig && sig_size))
         return -1;
     return dilithium_sign_finish(sec_level, sk, sk_size, sig, sig_size);
+}
+
+static uint8_t h_buf[DILITHIUM_H_LVL5_SIZE];
+LIB_EXPORT uint32_t _plat__Dilithium_HashVerifyStart(uint8_t sec_level, uint32_t message_size,
+                                                     const uint8_t *pk, uint16_t pk_size,
+                                                     const uint8_t *sig, uint16_t sig_size,
+                                                     uint32_t *ctx_id)
+{
+    if (!(pk && pk_size && sig && sig_size && ctx_id))
+        return -1;
+
+    // constant token, since our hardware only supports a single op at a time (single session)
+    *ctx_id = 1;
+
+    // Copy H into buffer, so we can use it later in the Finish operation...
+    // Not ideal, but required considering the way the core works.
+    // NOTE: We could have a more robust "saving" op, that puts this into a struct or something, storing the context
+    //       id, etc. But since we assume our core can only do one single simulteanous op, this is fine for now.
+    const uint32_t h_len = get_h_len(sec_level);
+    const uint32_t z_len = get_z_len(sec_level);
+    const uint8_t *h = sig + DILITHIUM_C_SIZE + z_len;
+    memcpy(h_buf, h, (size_t)h_len);
+
+    return dilithium_verify_start(sec_level, message_size, pk, pk_size, sig, sig_size);
+}
+
+LIB_EXPORT uint32_t _plat__Dilithium_HashVerifyFinish(uint32_t ctx_id, uint8_t sec_level, bool *accepted)
+{
+    (void)ctx_id;
+
+    if (!accepted)
+        return -1;
+
+    // This assumes that the Finish op uses the same sec_level as the Start op, which is a reasonable assumption.
+    // Even then, in the worst case scenario, we arent really leaking anything if the sec_level is different.
+    const uint32_t h_len = get_h_len(sec_level);
+    uint32_t rc = dilithium_verify_finish(sec_level, h_buf, h_len, accepted);
+
+    // Wipe h
+    memset(h_buf, 0, sizeof h_buf);
+
+    return rc;
 }
 
 #endif

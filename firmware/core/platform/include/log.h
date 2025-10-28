@@ -2,6 +2,7 @@
 #include <stdarg.h>
 #include <stdint.h>
 #include <stddef.h>
+#include <inttypes.h>
 
 // -----------------------------
 // Configuration (override via -D):

@@ -9,6 +9,8 @@ TPM_ALG_DILITHIUM = 0x0072
 TPM_CC_HashSignStart = 0x200001A0
 TPM_CC_HashSignFinish = 0x200001A1
 TPM_CC_SequenceUpdate = 0x0000015C
+TPM_CC_HashVerifyStart = 0x200001A2
+TPM_CC_HashVerifyFinish = 0x200001A3
 
 
 def _u32_be_hex(v: int) -> str:
@@ -127,6 +129,13 @@ class TpmTester:
         if len(rsp) < 14:
             raise RuntimeError("Response too short to contain a handle")
         return int.from_bytes(rsp[10:14], byteorder="big")
+    
+    def build_dilithium_signature_param(self, sig: bytes) -> str:
+        # TPMT_SIGNATURE for Dilithium: sigAlg(2) | hash(2=TPM_ALG_NULL) | TPM2B sig
+        sigAlg = _u16_be_hex(TPM_ALG_DILITHIUM)
+        hashAlg = _u16_be_hex(0x0010)  # TPM_ALG_NULL
+        tpmb = _u16_be_hex(len(sig)) + _bytes_hex(sig)
+        return f"{sigAlg}{hashAlg}{tpmb}"
 
     def startup_cmd(self, startup_type: str = "CLEAR"):
         # Map startup type to 2-byte parameter
@@ -433,6 +442,80 @@ class TpmTester:
             f"HashSignFinish OK: sigAlg=0x{sigAlg:04X}, hashAlg=0x{hashAlg:04X}, sig_len={sig_len}"
         )
         return sig_bytes
+    
+    def hashverify_start_cmd(self, key_handle: int, total_len: int, signature: bytes) -> int:
+        # No authorization required (public key); use ST_NO_SESSIONS
+        tag = "80 01"  # TPM_ST_NO_SESSIONS
+        cc = _u32_be_hex(TPM_CC_HashVerifyStart)
+
+        handle_hex = _u32_be_hex(key_handle)
+        total_hex = _u32_be_hex(int(total_len))
+        sig_param_hex = self.build_dilithium_signature_param(signature)
+
+        # header(10) + handle(4) + params(totalLen 4 + TPMT_SIGNATURE)
+        size_bytes = 10 + 4 + 4 + len(bytes.fromhex(sig_param_hex))
+        size_hex = _u32_be_hex(size_bytes)
+
+        bytestring = f"{tag}{size_hex}{cc}{handle_hex}{total_hex}{sig_param_hex}"
+        bytestream = bytes.fromhex(bytestring)
+
+        print(f"Sending HashVerifyStart(total_len={total_len})...")
+        self.uart.send_bytes(bytestream)
+        print(f"Waiting for HashVerifyStart answer...")
+        self.wait_for_ready_signal()
+        rsp = self.read_tpm_response(timeout=3600)
+        if not rsp:
+            raise RuntimeError("Failed to get HashVerifyStart() answer, aborting")
+        print("HashVerifyStart() response:\n", " ".join(f"{b:02X}" for b in rsp))
+
+        rc = int.from_bytes(rsp[6:10], "big")
+        if rc != 0:
+            raise RuntimeError(f"HashVerifyStart failed rc=0x{rc:08X}")
+
+        seq_handle = self.extract_first_handle_from_response(rsp)
+        print(f"HashVerifyStart OK, sequenceHandle=0x{seq_handle:08X}")
+        return seq_handle
+
+    def hashverify_finish_cmd(self, seq_handle: int):
+        # Mirror HashSignFinish (use ST_SESSIONS with empty RS_PW on the sequence)
+        tag = "80 02"  # TPM_ST_SESSIONS
+        cc = _u32_be_hex(TPM_CC_HashVerifyFinish)
+        handle_hex = _u32_be_hex(seq_handle)
+
+        # RS_PW auth with empty HMAC
+        auth_entry = "40000009" + "0000" + "00" + "0000"
+        auth_area_size_hex = _u32_be_hex(len(bytes.fromhex(auth_entry)))
+
+        size_bytes = 10 + 4 + 4 + len(bytes.fromhex(auth_entry))
+        size_hex = _u32_be_hex(size_bytes)
+
+        bytestring = f"{tag}{size_hex}{cc}{handle_hex}{auth_area_size_hex}{auth_entry}"
+        bytestream = bytes.fromhex(bytestring)
+
+        print("Sending HashVerifyFinish...")
+        self.uart.send_bytes(bytestream)
+        print("Waiting for HashVerifyFinish response...")
+        self.wait_for_ready_signal()
+        rsp = self.read_tpm_response(timeout=3600)
+        if not rsp:
+            raise RuntimeError("Failed to get HashVerifyFinish() answer, aborting")
+        print("HashVerifyFinish() response:\n", " ".join(f"{b:02X}" for b in rsp))
+
+        rc = int.from_bytes(rsp[6:10], "big")
+        if rc != 0:
+            raise RuntimeError(f"HashVerifyFinish failed rc=0x{rc:08X}")
+
+        # Parse TPMT_TK_VERIFIED from response parameters
+        off = _sessions_param_offset(rsp, response_handle_count=0)
+        tag_val = int.from_bytes(rsp[off : off + 2], "big"); off += 2
+        hierarchy = int.from_bytes(rsp[off : off + 4], "big"); off += 4
+        dsz = int.from_bytes(rsp[off : off + 2], "big"); off += 2
+        digest = rsp[off : off + dsz]
+
+        print(
+            f"HashVerifyFinish OK: ticket.tag=0x{tag_val:04X}, hierarchy=0x{hierarchy:08X}, digestLen={dsz}"
+        )
+        return (tag_val, hierarchy, digest)
 
     def run_hashsign_flow(self, message: bytes, chunk_size: int = 256) -> bytes:
         print("Running HashSignFlow...")
@@ -460,17 +543,50 @@ class TpmTester:
         print(f"Signature ({len(sig)} bytes): {sig.hex().upper()}")
         _write_hex_file(f"hashsign_sig_{ts}.hex", sig)
         return sig
+    
+    def run_dilithium_flow(self, message: bytes, chunk_size: int = 256) -> bool:
+        print("Running HashSign + HashVerify flow...")
+        resp = self.create_primary_dilithium_cmd()
+        key_handle = self.extract_first_handle_from_response(resp)
+        print(f"Dilithium key handle = 0x{key_handle:08X}")
 
-    def compare(self, name, expected, received, res_list):
-        if expected != received:
-            print(f"Mismatch between expected and received [{name}]")
-            res_list.append((name, expected, received))
+        # HashSign sequence
+        seq_sign = self.hashsign_start_cmd(
+            key_handle=key_handle, total_len=len(message), key_pw=b"abcd"
+        )
+        ts = time.strftime("%Y%m%d-%H%M%S")
+        print(f"Message ({len(message)} bytes): {message.hex().upper()}")
+        _write_hex_file(f"hashsign_msg_{ts}.hex", message)
+
+        sent = 0
+        while sent < len(message):
+            chunk = message[sent : sent + chunk_size]
+            self.sequence_update_cmd(seq_sign, chunk)
+            sent += len(chunk)
+        sig = self.hashsign_finish_cmd(seq_sign)
+        print(f"Signature ({len(sig)} bytes): {sig.hex().upper()}")
+        _write_hex_file(f"hashsign_sig_{ts}.hex", sig)
+
+        # HashVerify sequence
+        seq_verify = self.hashverify_start_cmd(
+            key_handle=key_handle, total_len=len(message), signature=sig
+        )
+        sent = 0
+        while sent < len(message):
+            chunk = message[sent : sent + chunk_size]
+            self.sequence_update_cmd(seq_verify, chunk)
+            sent += len(chunk)
+        ticket = self.hashverify_finish_cmd(seq_verify)
+        _write_hex_file(f"hashverify_ticket_{ts}.hex", ticket[2])
+        print("Verify succeeded and ticket stored.")
+        return True
 
     def test(self):
+        print("\nWaiting for SoC to signal it is READY...")
         self.wait_for_ready_signal()
-        self.startup_cmd()
-        self.create_primary_cmd()
-        return True
+        self.startup_cmd(startup_type="CLEAR")
+        msg = os.urandom(640)
+        return self.run_dilithium_flow(message=msg, chunk_size=256)
 
     def repl(self):
         print("\nWaiting for SoC to signal it is READY...")
@@ -492,7 +608,7 @@ class TpmTester:
             try:
                 cmd = (
                     input(
-                        "\nCommand [startup|get_random|create_primary|complete_hashsign|help|quit]: "
+                        "\nCommand [startup|get_random|create_primary|complete_hashsign|complete_dilithium|help|quit]: "
                     )
                     .strip()
                     .lower()
@@ -505,11 +621,12 @@ class TpmTester:
                 return True
             if cmd in ("help", "?"):
                 print("Available commands:")
-                print("  startup           - send TPM2_Startup (choose CLEAR or STATE)")
-                print("  get_random        - request N random bytes")
-                print("  create_primary    - send CreatePrimary sample command")
-                print("  complete_hashsign - do complete HashSign Dilithium flow")
-                print("  quit              - exit")
+                print("  startup            - send TPM2_Startup (choose CLEAR or STATE)")
+                print("  get_random         - request N random bytes")
+                print("  create_primary     - send CreatePrimary sample command")
+                print("  complete_hashsign  - do complete HashSign Dilithium flow")
+                print("  complete_dilithium - sign then verify the same message")
+                print("  quit               - exit")
                 continue
 
             if cmd == "startup":
@@ -546,6 +663,11 @@ class TpmTester:
                 # Simple demo message; adjust or prompt as needed
                 msg = os.urandom(640)
                 self.run_hashsign_flow(message=msg, chunk_size=256)
+                continue
+
+            if cmd in ("complete_dilithium"):
+                msg = os.urandom(640)
+                self.run_dilithium_flow(message=msg, chunk_size=256)
                 continue
 
             print("Unknown command. Type 'help'.")
