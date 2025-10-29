@@ -6,7 +6,7 @@ from utils import load_io_from_json
 
 
 def add_rtl_sources(platform: GenericPlatform, top_level_dir_path: str):
-    # Force correct compilation order for Keccak
+    # Force correct compilation order for Keccak. TODO: check if necessary
     keccak_files = [
         "keccak_pkg.sv",
         "components/latch.sv",
@@ -31,12 +31,13 @@ def add_rtl_sources(platform: GenericPlatform, top_level_dir_path: str):
         "keccak.sv",
     ]
 
-    dilithium_components_path = os.path.join(top_level_dir_path, "components/")
+    dilithium_top_level_path = os.path.join(top_level_dir_path, "dilithium-rtl/")
+    dilithium_components_path = os.path.join(dilithium_top_level_path, "components/")
     keccak_components_path = os.path.join(dilithium_components_path, "shake-sv/")
 
     platform.add_sources(keccak_components_path, *keccak_files)
     platform.add_source_dir(dilithium_components_path, recursive=False)
-    platform.add_source_dir(top_level_dir_path, recursive=False)
+    platform.add_source_dir(dilithium_top_level_path, recursive=False)
 
 
 class PetaliteSimPlatform(SimPlatform):
