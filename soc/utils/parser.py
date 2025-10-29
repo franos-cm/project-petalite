@@ -54,7 +54,7 @@ def arg_parser():
     parser.add_argument(
         "--rtl-dir-path",
         type=str,
-        default="./dilithium-rtl",
+        default="./soc/cores",
         help="Directory path for custom cores",
     )
     parser.add_argument(

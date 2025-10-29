@@ -6,6 +6,7 @@ tools/
 
 *.jou
 *.log
+*.hex
 *.str
 *.cache
 *.pyc

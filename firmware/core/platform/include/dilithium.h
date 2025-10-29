@@ -1,0 +1,67 @@
+#pragma once
+#include <stdint.h>
+#include <stdbool.h>
+#include <string.h>
+#include <generated/csr.h>
+#include <generated/soc.h>
+
+// NOTE: start of any read or write from dilithium must be 64 bit aligned.
+//       To account for that, we first do memcpy from the data's original location
+//       to the aligned buffers that will be referenced in the args (such as pk).
+//       Ideally we wouldnt have to do this, since it increases both latency and mem usage.
+//       To avoid it, we should change the DMA core to allow unaligned accesses, which is
+//       completely doable, but requires more extensive testing than this simply strategy.
+// NOTE: we probably could get rid of the dilithium_buffer and just deal with arrays in the firmware itself.
+
+#define DILITHIUM_H_LVL2_SIZE 84
+#define DILITHIUM_H_LVL3_SIZE 61
+#define DILITHIUM_H_LVL5_SIZE 83
+
+#define DILITHIUM_S1_LVL2_SIZE 384
+#define DILITHIUM_S1_LVL3_SIZE 640
+#define DILITHIUM_S1_LVL5_SIZE 672
+
+#define DILITHIUM_S2_LVL2_SIZE 384
+#define DILITHIUM_S2_LVL3_SIZE 768
+#define DILITHIUM_S2_LVL5_SIZE 768
+
+#define DILITHIUM_T0_LVL2_SIZE 1664
+#define DILITHIUM_T0_LVL3_SIZE 2496
+#define DILITHIUM_T0_LVL5_SIZE 3328
+
+#define DILITHIUM_T1_LVL2_SIZE 1280
+#define DILITHIUM_T1_LVL3_SIZE 1920
+#define DILITHIUM_T1_LVL5_SIZE 2560
+
+#define DILITHIUM_Z_LVL2_SIZE 2304
+#define DILITHIUM_Z_LVL3_SIZE 3200
+#define DILITHIUM_Z_LVL5_SIZE 4480
+
+#define DILITHIUM_SEED_SIZE 32
+#define DILITHIUM_K_SIZE 32
+#define DILITHIUM_RHO_SIZE 32
+#define DILITHIUM_TR_SIZE 32
+#define DILITHIUM_C_SIZE 32
+#define DILITHIUM_CORE_MLEN_SIZE 8
+
+#define DILITHIUM_CMD_KEYGEN 0
+#define DILITHIUM_CMD_VERIFY 1
+#define DILITHIUM_CMD_SIGN 2
+
+uint32_t get_h_len(uint8_t lvl);
+uint32_t get_z_len(uint8_t lvl);
+void dilithium_init(void);
+uint32_t dilithium_update(const uint8_t *msg_chunk, uint16_t msg_chunk_size);
+uint32_t dilithium_keygen(uint8_t sec_level,
+                          const uint8_t *seed,
+                          uint8_t *pk, uint16_t *pk_size,
+                          uint8_t *sk, uint16_t *sk_size);
+uint32_t dilithium_sign_start(uint8_t sec_level, uint32_t message_size,
+                              const uint8_t *sk, uint16_t sk_size);
+uint32_t dilithium_sign_finish(uint8_t sec_level,
+                               const uint8_t *sk, uint16_t sk_size,
+                               uint8_t *sig, uint16_t *sig_size);
+uint32_t dilithium_verify_start(uint8_t sec_level, uint32_t message_size,
+                                const uint8_t *pk, uint16_t pk_size,
+                                const uint8_t *sig, uint16_t sig_size);
+uint32_t dilithium_verify_finish(uint8_t sec_level, const uint8_t *h, uint16_t h_size, bool *accepted);
