@@ -110,14 +110,14 @@ python test/tpm.py --serial --interactive --log
 BOARD IS xc7vx690tffg1761-3
 
 # In tcp connection
-ssh user@100.100.128.33
-scp builds/soc/gateware/digilent_netfpga_sume.bit user@100.100.128.33:~/franos-cm/bitstreams/digilent-netfpga-sume-v2-trng.bit
+ssh user@100.100.128.87
+scp builds/soc/gateware/digilent_netfpga_sume.bit user@100.100.128.87:~/franos-cm/bitstreams/digilent-netfpga-sume-v3.bit
 
 export PATH=$HOME/franos-cm/python3.12/bin:$PATH
 source .venv/bin/activate
 source /tools/Xilinx/Vivado/2023.1/settings64.sh
 
-python test/tpm.py --serial --interactive --log
+python test/tpm.py --serial --log
 ./scripts/program-board.sh ~/franos-cm/bitstreams/digilent-netfpga-sume-v2-trng.bit
 
 

@@ -231,9 +231,17 @@ class UARTConnection:
                     # Keep original formatting for writes
                     if self.debug:
                         if isinstance(command, bytes):
-                            self._emit_log_line(
-                                f"[{self._ts()}] {self._id()}[WRITE] 0x{command.hex().upper()}"
-                            )
+                            hex_str = command.hex().upper()
+                            # Truncate very long logs for readability. TODO: maybe I dont want this.
+                            if len(command) > 256:
+                                preview = hex_str[:256]  # first 128 bytes shown
+                                self._emit_log_line(
+                                    f"[{self._ts()}] {self._id()}[WRITE] 0x{preview}... (len={len(command)})"
+                                )
+                            else:
+                                self._emit_log_line(
+                                    f"[{self._ts()}] {self._id()}[WRITE] 0x{hex_str}"
+                                )
                         elif isinstance(command, int):
                             self._emit_log_line(
                                 f"[{self._ts()}] {self._id()}[WRITE] 0x{command:X}"
