@@ -127,7 +127,7 @@ void trng_test(uint64_t words_samples)
     const uint64_t t0 = log_now_cycles();
     uint64_t ones = 0, words = 0;
 
-    LOGD("TRNG bench start");
+    LOGD("TRNG testbench start");
     while (words < words_samples)
     {
         uint32_t w = trng_read_u32(); // blocks; read-to-clear
@@ -150,7 +150,7 @@ void trng_test(uint64_t words_samples)
          (unsigned long long)wps,
          ones_bp / 100, ones_bp % 100,
          zeros_bp / 100, zeros_bp % 100);
-    LOGD("TRNG bench end");
+    LOGD("TRNG testbench end");
 }
 
 /* Per-sample timing: prints word + Δcycles + Δµs (integers only) */
