@@ -58,6 +58,12 @@ def arg_parser():
         help="Directory path for custom cores",
     )
     parser.add_argument(
+        "--dilithium-zetas-path",
+        type=str,
+        default="./soc/cores/dilithium-rtl/data/zetas.txt",
+        help="Path to the zetas.txt file used by Dilithium",
+    )
+    parser.add_argument(
         "--build-dir",
         type=str,
         help="Path to the build dir.",

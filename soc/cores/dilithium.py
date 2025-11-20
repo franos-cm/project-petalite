@@ -4,7 +4,7 @@ from litex.soc.interconnect.csr import CSRStorage, AutoCSR
 
 
 class Dilithium(Module, AutoCSR):
-    def __init__(self):
+    def __init__(self, zetas_path: str):
         # AXI-Stream endpoints -------------------------------------------------
         layout = [("data", 64)]
         self.sink = stream.Endpoint(layout)  # input to RTL
@@ -19,6 +19,8 @@ class Dilithium(Module, AutoCSR):
         # RTL instance ---------------------------------------------------------
         self.specials += Instance(
             "dilithium",
+            # Parametrs
+            p_ZETAS_PATH=zetas_path,
             # Control
             i_clk=ClockSignal(),
             i_rst=(ResetSignal() | self.reset.storage),

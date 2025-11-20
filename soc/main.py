@@ -1,4 +1,6 @@
 #!/usr/bin/env python3
+from pathlib import Path
+
 from litex.soc.integration.builder import Builder
 from litex_boards.platforms import digilent_netfpga_sume
 
@@ -23,6 +25,7 @@ def main():
         platform=platform,
         sys_clk_freq=args.sys_clk_freq,
         comm_protocol=args.comm,
+        dilithium_zetas_path=str(Path(args.dilithium_zetas_path).resolve()),
         integrated_rom_path=args.firmware,
         trace=args.trace,
         debug_bridge=args.debug_bridge,

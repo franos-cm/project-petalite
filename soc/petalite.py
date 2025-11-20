@@ -17,12 +17,14 @@ class PetaliteCore(SoCCore):
     comm_protocol: CommProtocol
     bus_data_width: int
     sys_clk_freq: int
+    dilithium_zetas_path: str
 
     def __init__(
         self,
         platform: GenericPlatform,
         sys_clk_freq: int,
         comm_protocol: CommProtocol,
+        dilithium_zetas_path: str,
         integrated_rom_path: str = None,
         nvm_mem_init: str = None,
         debug_bridge: bool = False,
@@ -33,6 +35,7 @@ class PetaliteCore(SoCCore):
         self.is_simulated = isinstance(platform, SimPlatform)
         self.sys_clk_freq = sys_clk_freq
         self.comm_protocol = comm_protocol
+        self.dilithium_zetas_path = dilithium_zetas_path
         self.setup_buffer_allocator()
 
         # NOTE: In theory, we could pass the integrated_rom_init param to the SoC intiializer
@@ -252,7 +255,7 @@ class PetaliteCore(SoCCore):
         self.add_csr("dilithium_reader")
         self.add_csr("dilithium_writer")
 
-        self.submodules.dilithium = Dilithium()
+        self.submodules.dilithium = Dilithium(zetas_path=self.dilithium_zetas_path)
         self.add_csr("dilithium")
         self.comb += [
             self.dilithium_reader.source.connect(self.dilithium.sink),
