@@ -167,7 +167,7 @@ class TpmTester:
         bytestring = (
             # ===== Header =====
             "80 02"  # TPM_ST_SESSIONS
-            "00 00 00 40"  # command size = 64 bytes
+            "00 00 00 3E"  # command size = 62 bytes
             "00 00 01 31"  # TPM_CC_CreatePrimary
             # ===== Handle =====
             "40 00 00 01"  # TPM_RH_OWNER
@@ -183,7 +183,7 @@ class TpmTester:
             "61 62 63 64"  # "abcd"
             "00 00"  # sensitive.data size = 0
             # ===== inPublic (TPM2B_PUBLIC) =====
-            "00 13"  # TPMT_PUBLIC size = 19
+            "00 11"  # TPMT_PUBLIC size = 17
             "00 72"  # type = TPM_ALG_DILITHIUM (0x0072)
             "00 0B"  # nameAlg = TPM_ALG_SHA256 (0x000B)
             "00 04 04 72"  # objectAttributes = 0x00040472

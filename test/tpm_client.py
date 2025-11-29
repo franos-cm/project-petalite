@@ -101,8 +101,8 @@ class TPMClient:
     def create_primary_dilithium_cmd(self):
         # Exact command aligned with working tpm.py tester (avoid extra trailing zeros)
         hex_cmd = (
-            "8002000000400000013140000001000000094000000900000000000008000461626364"
-            "000000130072000B00040472000000100010020000000000000000"
+            "80020000003E0000013140000001000000094000000900000000000008000461626364"
+            "000000110072000B00040472000000100010020000000000000000"
         )
         bytestream = bytes.fromhex(hex_cmd)
         print("Sending create_primary_dilithium() command...")
