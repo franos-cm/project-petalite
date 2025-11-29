@@ -9,3 +9,6 @@
 	path = firmware/pq-tpm
 	url = https://github.com/franos-cm/pq-tpm.git
 	branch = main
+[submodule "firmware/dilithium-ref"]
+	path = firmware/dilithium-ref
+	url = https://github.com/franos-cm/dilithium-ref.git

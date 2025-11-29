@@ -9,6 +9,13 @@
 #include "dilithium.h"
 #include "log.h"
 
+#ifndef DILITHIUM_HW_ACCELERATOR
+// Shim for dilithium-ref randombytes requirement
+void randombytes(uint8_t *out, size_t outlen) {
+    _plat__GetEntropy(out, (uint32_t)outlen);
+}
+#endif
+
 #if PLAT_ENTROPY_CONDITION_SHA256
 #include <wolfssl/wolfcrypt/sha256.h>
 #endif
@@ -514,6 +521,14 @@ LIB_EXPORT uint32_t _plat__GetTpmType()
 // NOTE: its size is currently defined by the max length of a message chunk, considering an 8 kB buffer
 unsigned char dilithium_aligned_buffer[8176] __attribute__((aligned(8)));
 
+#ifndef DILITHIUM_HW_ACCELERATOR
+// Software mode buffers exposed to upper layers
+uint32_t dilithium_sw_msg_len = 0;
+// Max sizes for Dilithium5
+uint8_t  dilithium_sw_pk_cache[2592]; // Sufficient for Dilithium5 PK
+uint8_t  dilithium_sw_sig_cache[4595]; // Sufficient for Dilithium5 Sig
+#endif
+
 // Stream message chunks to hardware
 uint32_t _plat__Dilithium_Update(uint32_t ctx_id,
                                  const uint8_t *chunk,
@@ -523,11 +538,25 @@ uint32_t _plat__Dilithium_Update(uint32_t ctx_id,
     if (!(chunk_size && chunk))
         return -1;
 
+#ifdef DILITHIUM_HW_ACCELERATOR
     // NOTE: message needs to be 8 byte aligned, so it works with Litex DMA
     uint8_t *msg_buffer = dilithium_aligned_buffer;
     memcpy(msg_buffer, chunk, chunk_size);
     return dilithium_update(msg_buffer, chunk_size);
+#else
+    // Software: Accumulate message in buffer
+    // We implement this here because we cannot modify the caller (SequenceUpdate)
+    if (dilithium_sw_msg_len + chunk_size > sizeof(dilithium_aligned_buffer)) {
+        LOGE("Dilithium SW: Message buffer overflow");
+        return -1;
+    }
+    memcpy(dilithium_aligned_buffer + dilithium_sw_msg_len, chunk, chunk_size);
+    dilithium_sw_msg_len += chunk_size;
+    return 0;
+#endif
 }
+
+#ifdef DILITHIUM_HW_ACCELERATOR
 
 uint32_t _plat__Dilithium_KeyGen(uint8_t sec_level,
                                  uint8_t *pk, uint16_t *pk_size,
@@ -615,5 +644,7 @@ LIB_EXPORT uint32_t _plat__Dilithium_HashVerifyFinish(uint32_t ctx_id, uint8_t s
 
     return rc;
 }
+
+#endif // DILITHIUM_HW_ACCELERATOR
 
 #endif
