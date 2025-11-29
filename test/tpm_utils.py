@@ -47,24 +47,33 @@ def parse_createprimary_outpublic(rsp: bytes):
         raise RuntimeError("Bad CreatePrimary response (truncated outPublic)")
 
     p = off
-    type_alg = int.from_bytes(rsp[p : p + 2], "big"); p += 2
-    name_alg = int.from_bytes(rsp[p : p + 2], "big"); p += 2
-    object_attrs = int.from_bytes(rsp[p : p + 4], "big"); p += 4
-    ap_size = int.from_bytes(rsp[p : p + 2], "big"); p += 2
+    type_alg = int.from_bytes(rsp[p : p + 2], "big")
+    p += 2
+    name_alg = int.from_bytes(rsp[p : p + 2], "big")
+    p += 2
+    object_attrs = int.from_bytes(rsp[p : p + 4], "big")
+    p += 4
+    ap_size = int.from_bytes(rsp[p : p + 2], "big")
+    p += 2
     p += ap_size
 
     if type_alg == TPM_ALG_DILITHIUM:
-        p += 2 + 2 + 1 + 2  # symmetric + scheme + securityLevel + nameHashAlg
-        u_size = int.from_bytes(rsp[p : p + 2], "big"); p += 2
+        p += 2 + 2 + 1  # symmetric + scheme + securityLevel
+        u_size = int.from_bytes(rsp[p : p + 2], "big")
+        p += 2
         pub = rsp[p : p + u_size]
         return {"type": "dilithium", "nameAlg": name_alg, "objectAttributes": object_attrs, "pub": pub}
 
     if type_alg == TPM_ALG_ECC:
         p += 2 + 2 + 2 + 2 + 2  # ECC parameters
-        x_size = int.from_bytes(rsp[p : p + 2], "big"); p += 2
-        x = rsp[p : p + x_size]; p += x_size
-        y_size = int.from_bytes(rsp[p : p + 2], "big"); p += 2
-        y = rsp[p : p + y_size]; p += y_size
+        x_size = int.from_bytes(rsp[p : p + 2], "big")
+        p += 2
+        x = rsp[p : p + x_size]
+        p += x_size
+        y_size = int.from_bytes(rsp[p : p + 2], "big")
+        p += 2
+        y = rsp[p : p + y_size]
+        p += y_size
         return {"type": "ecc", "nameAlg": name_alg, "objectAttributes": object_attrs, "x": x, "y": y}
 
     return {"type": f"0x{type_alg:04X}", "nameAlg": name_alg, "objectAttributes": object_attrs, "raw": rsp[off:end]}

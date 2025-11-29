@@ -30,8 +30,8 @@
 // Cancel flag (simulate host cancel)
 static volatile int s_cancel_flag = 0;
 
-// Software "tick" counter: increment this from a timer ISR or your board tick.
-// Units: 1 tick == 1 millisecond (choose and keep consistent across the port).
+// Software "tick" counter: increment this from a timer ISR or the board tick.
+// TODO: update this.
 static volatile uint64_t s_tick_ms = 0;
 
 // Timer status flags the core may poll
@@ -41,7 +41,7 @@ static volatile int s_timer_stopped_flag = 0;
 // Power-lost latch: return 1 once after a power event, then clear
 static volatile int s_power_lost_latch = 0;
 
-// NV emulation in RAM to let you link/run:
+// NV emulation in RAM:
 // - s_nv_image: "committed" persistent image
 // - s_nv_shadow: staging area modified by NvMemoryWrite/Clear/Move
 // - s_nv_dirty: tracks if shadow differs and Commit is needed
@@ -53,7 +53,6 @@ static int s_nv_dirty = 0;
 static uint32_t s_last_entropy_word = 0;
 static bool s_have_last_entropy = false;
 
-// Vendor/firmware identifiers (pick meaningful values for your product)
 static inline uint32_t fourcc(const char a[4])
 {
     return ((uint32_t)(uint8_t)a[0] << 24) |
@@ -62,20 +61,15 @@ static inline uint32_t fourcc(const char a[4])
            ((uint32_t)(uint8_t)a[3] << 0);
 }
 
-// ---------- Tiny helpers you can call from your BSP ----------
-
-// Call this from your SysTick/timer ISR every millisecond (or adjust units).
-void _plat__Tick1ms(void) { s_tick_ms++; }
-
-// If your platform detects a power-loss/restore, call this once on boot.
+// If the platform detects a power-loss/restore, call this once on boot.
 int _plat__Signal_PowerOn(void)
 {
     s_power_lost_latch = 1;
-    // If your hardware timer might have gone backwards across power,
+    // If the hardware timer might have gone backwards across power,
     // call _plat__TimerReset() semantics:
     s_timer_reset_flag = 1;
 
-    // Initialize modules. TODO: should we do this on power-on or somewhere else?
+    // Initialize modules.
     // Initialize TRNG with defaults
     trng_init(NULL);
     s_have_last_entropy = false;
@@ -99,9 +93,6 @@ int _plat__Signal_Reset(void)
 
     return 0;
 }
-
-// If your platform can suspend the tick, call this on stop/start:
-void _plat__Signal_TimerStopped(void) { s_timer_stopped_flag = 1; }
 
 // Optional: set/clear cancel flag from host/GPIO/UART command
 void _plat__SetCancel(void) { s_cancel_flag = 1; }
@@ -138,8 +129,8 @@ LIB_EXPORT int _plat__TimerWasStopped(void)
 
 LIB_EXPORT void _plat__ClockRateAdjust(_plat__ClockAdjustStep adjustment)
 {
-    // Optional: adjust your hardware timer's rate in small steps.
-    // For now, a no-op is acceptable (the core tolerates it).
+    // Optional: adjust hardware timer's rate in small steps.
+    // For now, a no-op is acceptable.
     (void)adjustment;
 }
 
@@ -240,7 +231,7 @@ LIB_EXPORT int32_t _plat__GetEntropy(unsigned char *entropy, uint32_t amount)
 
 LIB_EXPORT unsigned char _plat__LocalityGet(void)
 {
-    // If your transport encodes locality, return it here. Default to 0.
+    // If transport encodes locality, return it here. Default to 0.
     return (unsigned char)0;
 }
 
@@ -250,7 +241,7 @@ LIB_EXPORT int _plat__NVEnable(void *platParameter, size_t paramSize)
 {
     (void)platParameter;
     (void)paramSize;
-    // On first enable, initialize shadow = image. In a real port, you would:
+    // On first enable, initialize shadow = image. In a real port, we would:
     // - verify integrity of NV,
     // - load from flash/RPMB/EEPROM,
     // - handle failure modes.
@@ -433,7 +424,7 @@ LIB_EXPORT void _plat__GetPlatformManufactureData(uint8_t *pData, uint32_t buffe
 
 LIB_EXPORT uint32_t _plat__GetManufacturerCapabilityCode()
 {
-    // 4 ASCII chars (no NUL). Choose your own; example "LTXS".
+    // 4 ASCII chars. Choose your own; arbitrary "LTXS" was chosen.
     return fourcc("LTXS");
 }
 
@@ -470,12 +461,12 @@ LIB_EXPORT uint32_t _plat__GetTpmFirmwareVersionLow()
 LIB_EXPORT uint16_t _plat__GetTpmFirmwareSvn(void)
 {
     // Security Version Number (monotonic anti-rollback counter)
-    return 0; // start at 0 unless you enforce anti-rollback
+    return 0; // start at 0 unless anti-rollback is enforced
 }
 
 LIB_EXPORT uint16_t _plat__GetTpmFirmwareMaxSvn(void)
 {
-    return 0; // maximum SVN value (set accordingly if you use SVN)
+    return 0; // maximum SVN value (set accordingly if SVN is used)
 }
 
 #if SVN_LIMITED_SUPPORT
@@ -488,7 +479,7 @@ LIB_EXPORT int _plat__GetTpmFirmwareSvnSecret(uint16_t svn,
     (void)secret_buf_size;
     (void)secret_buf;
     (void)secret_size;
-    // TODO: implement if you support SVN-limited secrets
+    // TODO: implement if support SVN-limited secrets
     return -1;
 }
 #endif
@@ -501,7 +492,7 @@ LIB_EXPORT int _plat__GetTpmFirmwareSecret(uint16_t secret_buf_size,
     (void)secret_buf_size;
     (void)secret_buf;
     (void)secret_size;
-    // TODO: implement if you bind secrets to the current firmware image
+    // TODO: implement if bind secrets to the current firmware image
     return -1;
 }
 #endif
@@ -510,7 +501,7 @@ LIB_EXPORT int _plat__GetTpmFirmwareSecret(uint16_t secret_buf_size,
 
 LIB_EXPORT uint32_t _plat__GetTpmType()
 {
-    // TPM_PT_VENDOR_TPM_TYPE value. 0 is "not reported"; set per your product.
+    // TPM_PT_VENDOR_TPM_TYPE value. 0 is "not reported"; set per product.
     // Common values used by some vendors: discrete(0x00000000), firmware(0x00000001), integrated(0x00000002)
     return 0; // not reported
 }
