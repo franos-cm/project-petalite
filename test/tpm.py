@@ -86,7 +86,7 @@ class TpmTester:
         """
         Read a full TPM response. When latency_metrics is enabled (or expect_latency
         is True), it first reads a latency record, then the TPM response.
-        Returns `bytes` (response). If latency is present, it's logged to stdout.
+        Returns `bytes` (response).
         """
         if expect_latency is None:
             expect_latency = self.latency_metrics
@@ -96,12 +96,18 @@ class TpmTester:
             print(f"TPM command latency: {lat_cycles} cycles")
             return rsp
 
-        # Legacy behavior: just header+body after a single READY
+        # Legacy behavior: just header+body, no READY/latency handling.
+        # NOTE: with current firmware (which always sends READY+latency+READY+response),
+        # calling this will desync the stream.
         header = self.uart.wait_for_bytes(num_bytes=10, timeout=timeout)
+        if not header or len(header) < 10:
+            raise RuntimeError("Short TPM response header")
         response_size = int.from_bytes(header[2:6], byteorder="big")
         body = self.uart.wait_for_bytes(
             num_bytes=(response_size - 10), timeout=timeout
         )
+        if not body or len(body) < (response_size - 10):
+            raise RuntimeError("Short TPM response body")
         return header + body
 
     def extract_first_handle_from_response(self, rsp: bytes) -> int:
@@ -148,7 +154,8 @@ class TpmTester:
         self.uart.send_bytes(bytestream)
 
         print("Waiting for get_random answer...")
-        self.wait_for_ready_signal()
+        # DO NOT call wait_for_ready_signal() here when using latency;
+        # read_tpm_response() will consume READY+latency+READY+response.
         result = self.read_tpm_response(timeout=3600)
 
         if not result:
@@ -192,7 +199,7 @@ class TpmTester:
         self.uart.send_bytes(bytestream)
 
         print("Waiting for create_primary() answer...")
-        self.wait_for_ready_signal()
+        # No extra wait_for_ready_signal(); rely on read_tpm_response()
         result = self.read_tpm_response(timeout=3600)
 
         if not result:
@@ -262,7 +269,6 @@ class TpmTester:
         self.uart.send_bytes(bytestream)
 
         print("Waiting for create_primary_dilithium() answer...")
-        self.wait_for_ready_signal()
         result = self.read_tpm_response(timeout=3600)
 
         if not result:
@@ -322,7 +328,6 @@ class TpmTester:
         self.uart.send_bytes(bytestream)
 
         print(f"Waiting for HashSignStart(total_len={total_len}) answer...")
-        self.wait_for_ready_signal()
         result = self.read_tpm_response(timeout=3600)
 
         if not result:
@@ -365,7 +370,6 @@ class TpmTester:
         print(f"Sending SequenceUpdate command...")
         self.uart.send_bytes(bytestream)
         print(f"Waiting for SequenceUpdate answer...")
-        self.wait_for_ready_signal()
         result = self.read_tpm_response(timeout=3600)
 
         if not result:
@@ -391,7 +395,6 @@ class TpmTester:
         print("Sending HashSignFinish...")
         self.uart.send_bytes(bytestream)
         print("Waiting for HashSignFinish response...")
-        self.wait_for_ready_signal()
         result = self.read_tpm_response(timeout=3600)
 
         if not result:
@@ -438,7 +441,6 @@ class TpmTester:
         print(f"Sending HashVerifyStart(total_len={total_len})...")
         self.uart.send_bytes(bytestream)
         print(f"Waiting for HashVerifyStart answer...")
-        self.wait_for_ready_signal()
         rsp = self.read_tpm_response(timeout=3600)
         if not rsp:
             raise RuntimeError("Failed to get HashVerifyStart() answer, aborting")
@@ -471,7 +473,6 @@ class TpmTester:
         print("Sending HashVerifyFinish...")
         self.uart.send_bytes(bytestream)
         print("Waiting for HashVerifyFinish response...")
-        self.wait_for_ready_signal()
         rsp = self.read_tpm_response(timeout=3600)
         if not rsp:
             raise RuntimeError("Failed to get HashVerifyFinish() answer, aborting")

@@ -77,7 +77,7 @@ class TPMDashboard(BaseWindow):
         self.geometry("1280x840")
 
         # store latency flag for later use in connect()
-        self.latency_metrics = latency_metrics
+        self.latency_metrics = bool(latency_metrics)
 
         # Avoid clashing with ttkbootstrap Window's `style` property
         self._style = (ttkb.Style() if ttkb is not None else ttk.Style())
@@ -535,8 +535,8 @@ class TPMDashboard(BaseWindow):
                         name="Dashboard",
                     )
                 self.uart = uart
-                # Default to no latency unless CLI set it
-                latency = getattr(self, "latency_metrics", False)
+                # Pass latency flag directly into TPMClient
+                latency = bool(self.latency_metrics)
                 self.client = TPMClient(
                     self.uart,
                     on_command=self._on_command,

@@ -103,7 +103,9 @@ class TPMClient:
             print(f"TPM command latency: {lat_cycles} cycles")
             return rsp
 
-        # Legacy: no READY / latency parsing here
+        # Legacy: no READY / latency parsing here.
+        # NOTE: with current firmware (which always sends READY+latency+READY+response),
+        # using this path will desync the stream.
         header = self.uart.wait_for_bytes(num_bytes=10, timeout=timeout)
         if not header or len(header) < 10:
             raise RuntimeError("Short TPM response header")
