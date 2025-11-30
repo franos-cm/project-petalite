@@ -68,13 +68,16 @@ BaseWindow = ttkb.Window if ttkb is not None else tk.Tk
 
 
 class TPMDashboard(BaseWindow):
-    def __init__(self, themename: str | None = None):
+    def __init__(self, themename: str | None = None, latency_metrics: bool = False):
         if ttkb is not None:
             super().__init__(themename=themename or "darkly")  # try: flatly, cyborg, solar
         else:
             super().__init__()
         self.title("TPM Dilithium Dashboard • Modern")
         self.geometry("1280x840")
+
+        # store latency flag for later use in connect()
+        self.latency_metrics = bool(latency_metrics)
 
         # Avoid clashing with ttkbootstrap Window's `style` property
         self._style = (ttkb.Style() if ttkb is not None else ttk.Style())
@@ -204,6 +207,16 @@ class TPMDashboard(BaseWindow):
         self.baud_label = ttk.Label(left, text="Baud")
         self.baud_entry = ttk.Entry(left)
         self.baud_entry.insert(0, "115200")
+
+        # Place fields; we'll toggle visibility based on mode
+        self.tcp_host_label.grid(row=2, column=0, sticky="w")
+        self.host_entry.grid(row=2, column=1, columnspan=2, sticky="ew")
+        self.tcp_port_label.grid(row=3, column=0, sticky="w")
+        self.port_entry.grid(row=3, column=1, columnspan=2, sticky="ew")
+        self.serial_dev_label.grid(row=4, column=0, sticky="w")
+        self.ser_entry.grid(row=4, column=1, columnspan=2, sticky="ew")
+        self.baud_label.grid(row=5, column=0, sticky="w")
+        self.baud_entry.grid(row=5, column=1, columnspan=2, sticky="ew")
 
         # Place fields; we'll toggle visibility based on mode
         self.tcp_host_label.grid(row=2, column=0, sticky="w")
@@ -522,7 +535,14 @@ class TPMDashboard(BaseWindow):
                         name="Dashboard",
                     )
                 self.uart = uart
-                self.client = TPMClient(self.uart, on_command=self._on_command, on_response=self._on_response)
+                # Pass latency flag directly into TPMClient
+                latency = bool(self.latency_metrics)
+                self.client = TPMClient(
+                    self.uart,
+                    on_command=self._on_command,
+                    on_response=self._on_response,
+                    latency_metrics=latency,
+                )
 
                 # Stage 1 complete: transport connected
                 t1 = time.perf_counter()
@@ -1062,7 +1082,11 @@ class TPMDashboard(BaseWindow):
         if self._running_action == name:
             elapsed = time.perf_counter() - self._running_t0
             mark = "✓" if success else "✗"
-            text = (f"Done {mark} in {elapsed:.2f}s" if success else f"Error {mark} after {elapsed:.2f}s")
+            text = (
+                f"Done {mark} in {elapsed:.2f}s"
+                if success
+                else f"Error {mark} after {elapsed:.2f}s"
+            )
             try:
                 var.set(text)
             except Exception:
@@ -1071,5 +1095,19 @@ class TPMDashboard(BaseWindow):
 
 
 if __name__ == "__main__":
-    app = TPMDashboard()
+    import argparse
+
+    parser = argparse.ArgumentParser(description="TPM Dilithium Dashboard")
+    parser.add_argument(
+        "--latency-metrics",
+        action="store_true",
+        help=(
+            "Expect two READYs per TPM command (latency record + response) "
+            "and log per-command latency."
+        ),
+    )
+    args = parser.parse_args()
+
+    # Pass flag directly into the dashboard; no post-hoc mutation
+    app = TPMDashboard(latency_metrics=bool(args.latency_metrics))
     app.mainloop()

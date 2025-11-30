@@ -17,6 +17,7 @@ FORCE_SOC_BUILD=${FORCE_SOC_BUILD:-0}
 FORCE_ALL=${FORCE_ALL:-0}
 # Build target selection: default to simulation unless BOARD mode requested
 BOARD_BUILD=${BOARD_BUILD:-0}
+NO_HW_ACCEL=${NO_HW_ACCEL:-0}
 
 # Backward compatibility: legacy env FORCE_SOC still respected
 if [ "${FORCE_SOC:-0}" = "1" ] && [ "$FORCE_SOC_BUILD" = "0" ]; then
@@ -34,6 +35,7 @@ Options:
   --force-soc-build     Force full SoC rebuild (deletes builds/soc before building)
   --force-all           Shorthand for --force-soc-build and --force-wolfssl-build
   --board               Build SoC for a physical board (no --sim). Default is simulation.
+  --no-hw-accel         Disable Dilithium HW Accelerator (use software ref)
   -h, --help            Show this help
 
 Assumptions:
@@ -53,6 +55,7 @@ for arg in "$@"; do
   --force-wolfssl-build) FORCE_WOLFSSL_BUILD=1 ;;
   --force-soc-build) FORCE_SOC_BUILD=1 ;;
     --board) BOARD_BUILD=1 ;;
+    --no-hw-accel) NO_HW_ACCEL=1 ;;
     --force-all) FORCE_WOLFSSL_BUILD=1; FORCE_SOC_BUILD=1; FORCE_ALL=1 ;;
     -h|--help) usage; exit 0 ;;
     *) echo "Unknown option: $arg" >&2; usage; exit 1 ;;
@@ -63,6 +66,13 @@ done
 if [ "$FORCE_ALL" = "1" ]; then
   FORCE_WOLFSSL_BUILD=1
   FORCE_SOC_BUILD=1
+fi
+
+# Export HW Accelerator flag for firmware.py -> make
+if [ "$NO_HW_ACCEL" = "1" ]; then
+  export DILITHIUM_HW_ACCELERATOR=0
+else
+  export DILITHIUM_HW_ACCELERATOR=1
 fi
 
 # Compute repo root as the parent of this script's directory

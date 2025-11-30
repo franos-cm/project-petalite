@@ -66,8 +66,8 @@ class PetaliteCore(SoCCore):
             # Communication
             with_uart=False,
             # Memory specs, considering full TPM firmware
-            integrated_rom_size=224 * KBYTE,
-            integrated_sram_size=160 * KBYTE, # Increase SRAM size if we need more heap/stack mem
+            integrated_rom_size=256 * KBYTE,
+            integrated_sram_size=224 * KBYTE, # Increase SRAM size if we need more heap/stack mem
             integrated_rom_init=integrated_rom_data,
         )
 

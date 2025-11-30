@@ -16,3 +16,7 @@
 #ifndef PLAT_ENTROPY_CONDITION_IN_PER_OUT32
 #define PLAT_ENTROPY_CONDITION_IN_PER_OUT32 64
 #endif
+
+
+// Return latency measure (i.e. cycle count) of the command before the response itself
+#define INCLUDE_LATENCY_MEASURES 1

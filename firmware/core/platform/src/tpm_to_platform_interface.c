@@ -9,6 +9,15 @@
 #include "dilithium.h"
 #include "log.h"
 
+#ifndef DILITHIUM_HW_ACCELERATOR
+#include "dilithium_ref.h"   // for dilithium_sw_msg_len/cache
+
+// Shim for dilithium-ref randombytes requirement
+void randombytes(uint8_t *out, size_t outlen) {
+    _plat__GetEntropy(out, (uint32_t)outlen);
+}
+#endif
+
 #if PLAT_ENTROPY_CONDITION_SHA256
 #include <wolfssl/wolfcrypt/sha256.h>
 #endif
@@ -523,11 +532,25 @@ uint32_t _plat__Dilithium_Update(uint32_t ctx_id,
     if (!(chunk_size && chunk))
         return -1;
 
+#ifdef DILITHIUM_HW_ACCELERATOR
     // NOTE: message needs to be 8 byte aligned, so it works with Litex DMA
     uint8_t *msg_buffer = dilithium_aligned_buffer;
     memcpy(msg_buffer, chunk, chunk_size);
     return dilithium_update(msg_buffer, chunk_size);
+#else
+    // Software: Accumulate message in buffer
+    // We implement this here because we cannot modify the caller (SequenceUpdate)
+    if (dilithium_sw_msg_len + chunk_size > sizeof(dilithium_aligned_buffer)) {
+        LOGE("Dilithium SW: Message buffer overflow");
+        return -1;
+    }
+    memcpy(dilithium_aligned_buffer + dilithium_sw_msg_len, chunk, chunk_size);
+    dilithium_sw_msg_len += chunk_size;
+    return 0;
+#endif
 }
+
+#ifdef DILITHIUM_HW_ACCELERATOR
 
 uint32_t _plat__Dilithium_KeyGen(uint8_t sec_level,
                                  uint8_t *pk, uint16_t *pk_size,
@@ -546,8 +569,7 @@ uint32_t _plat__Dilithium_KeyGen(uint8_t sec_level,
     uint32_t rc = dilithium_keygen(sec_level, seed, pk, pk_size, sk, sk_size);
 
     // wipe seed
-    for (size_t i = 0; i < sizeof(seed); i++)
-        ((volatile uint8_t *)seed)[i] = 0;
+    memset(seed, 0, sizeof seed);
 
     return rc;
 }
@@ -615,5 +637,7 @@ LIB_EXPORT uint32_t _plat__Dilithium_HashVerifyFinish(uint32_t ctx_id, uint8_t s
 
     return rc;
 }
+
+#endif // DILITHIUM_HW_ACCELERATOR
 
 #endif

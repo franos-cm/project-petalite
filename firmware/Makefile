@@ -13,6 +13,7 @@ WOLFSSL_SRC_DIR      ?= $(abspath wolfssl)
 TPM_ROOT             := $(abspath pq-tpm/TPMCmd)
 WOLFSSL_INSTALL_DIR  := $(abspath $(SOC_BUILD_DIR)/software/wolfssl)
 FIRMWARE_NAME        ?= firmware
+DILITHIUM_REF_DIR    := $(ROOT_DIR)/firmware/dilithium-ref/ref
 .DEFAULT_GOAL        := all
 
 # =========================
@@ -108,6 +109,17 @@ LDFLAGS += -Wl,-Map=$(FIRMWARE_MAP)
 CFLAGS  += -flto
 LDFLAGS += -flto
 
+# =========================
+# Dilithium Configuration (Flags)
+# =========================
+DILITHIUM_HW_ACCELERATOR ?= 1
+
+ifeq ($(DILITHIUM_HW_ACCELERATOR),1)
+  CFLAGS += -DDILITHIUM_HW_ACCELERATOR
+else
+  # Software Mode: Add reference implementation includes
+  CFLAGS += -I$(DILITHIUM_REF_DIR)
+endif
 
 # =========================
 # wolfSSL build
@@ -248,6 +260,41 @@ STARTUP_SRC  := $(CPU_DIRECTORY)/crt0.S
 STARTUP_OBJ  := $(FIRMWARE_BUILD_DIR)/crt0.o
 FIRMWARE_SRCS := $(APP_DIR)/main.c
 FIRMWARE_OBJS := $(patsubst $(APP_DIR)/%.c,$(FIRMWARE_BUILD_DIR)/%.o,$(FIRMWARE_SRCS))
+
+# =========================
+# Dilithium Support (Objects)
+# =========================
+ifneq ($(DILITHIUM_HW_ACCELERATOR),1)
+  # --- Software Mode: Build Reference Implementation ---
+  
+  # Common sources (Keccak/FIPS202)
+  DIL_COMMON_SRCS := $(DILITHIUM_REF_DIR)/fips202.c
+  DIL_COMMON_OBJS := $(patsubst $(DILITHIUM_REF_DIR)/%.c,$(FIRMWARE_BUILD_DIR)/dilithium_ref/%.o,$(DIL_COMMON_SRCS))
+
+  $(FIRMWARE_BUILD_DIR)/dilithium_ref/%.o: $(DILITHIUM_REF_DIR)/%.c
+	@mkdir -p $(dir $@)
+	$(CC) -MMD -MP -c $(CFLAGS) $< -o $@
+
+  FIRMWARE_OBJS += $(DIL_COMMON_OBJS)
+
+  # Mode-specific sources
+  DIL_CORE_SRCS := sign.c packing.c polyvec.c poly.c ntt.c reduce.c rounding.c symmetric-shake.c
+
+  # Macro to generate rules for a specific mode (2, 3, 5)
+  define dilithium_mode_rules
+    DIL_MODE$(1)_OBJS := $$(patsubst %.c,$$(FIRMWARE_BUILD_DIR)/dilithium_ref/mode$(1)/%.o,$$(DIL_CORE_SRCS))
+
+    $$(FIRMWARE_BUILD_DIR)/dilithium_ref/mode$(1)/%.o: $$(DILITHIUM_REF_DIR)/%.c
+		@mkdir -p $$(dir $$@)
+		$$(CC) -MMD -MP -c $$(CFLAGS) -DDILITHIUM_MODE=$(1) $$< -o $$@
+
+    FIRMWARE_OBJS += $$(DIL_MODE$(1)_OBJS)
+  endef
+
+  $(eval $(call dilithium_mode_rules,2))
+  $(eval $(call dilithium_mode_rules,3))
+  $(eval $(call dilithium_mode_rules,5))
+endif
 
 FIRMWARE_CFLAGS := $(CFLAGS) $(TPM_INCLUDES) \
                    -DWOLFSSL_USER_SETTINGS \
