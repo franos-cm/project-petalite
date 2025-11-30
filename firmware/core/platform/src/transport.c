@@ -150,9 +150,28 @@ void transport_write_rsp(const uint8_t *buf, uint32_t len)
     }
 }
 
-void _debug_transport_write_ready(void)
+void transport_write_ready(void)
 {
     transport_write_byte(0xA0);
+}
+
+// Send a latency record: 8-byte big-endian cycle count.
+inline void transport_write_latency_record(uint64_t cycles)
+{
+    uint8_t rec[TPM_LATENCY_RECORD_LEN];
+
+    // big-endian 64-bit
+    rec[0] = (uint8_t)((cycles >> 56) & 0xFF);
+    rec[1] = (uint8_t)((cycles >> 48) & 0xFF);
+    rec[2] = (uint8_t)((cycles >> 40) & 0xFF);
+    rec[3] = (uint8_t)((cycles >> 32) & 0xFF);
+    rec[4] = (uint8_t)((cycles >> 24) & 0xFF);
+    rec[5] = (uint8_t)((cycles >> 16) & 0xFF);
+    rec[6] = (uint8_t)((cycles >> 8) & 0xFF);
+    rec[7] = (uint8_t)((cycles >> 0) & 0xFF);
+
+    for (uint32_t i = 0; i < TPM_LATENCY_RECORD_LEN; ++i)
+        transport_write_byte(rec[i]);
 }
 
 void debug_breakpoint(uint8_t b)

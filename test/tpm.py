@@ -20,12 +20,13 @@ from tpm_utils import (
     build_dilithium_signature_param as _build_dilithium_signature_param,
 )
 
+# Latency protocol constants (mirror firmware)
+TPM_LATENCY_RECORD_LEN = 8  # 8-byte big-endian cycle count
+
 
 def _write_hex_file(path: str, data: bytes) -> None:
     with open(path, "w") as f:
         f.write(data.hex().upper() + "\n")
-
-
 
 
 class TpmTester:
@@ -33,17 +34,74 @@ class TpmTester:
 
     uart: UARTConnection
 
-    def __init__(self, uart: UARTConnection):
+    def __init__(self, uart: UARTConnection, latency_metrics: bool = False):
         self.uart = uart
+        self.latency_metrics = latency_metrics
 
+    # ---- Low-level helpers ----
+    def _read_ready_and_bytes(self, num_bytes: int, timeout: float) -> bytes:
+        """
+        Wait for one READY marker from the SoC, then read num_bytes.
+        """
+        # Existing UARTConnection.wait_for_ready() already blocks for READY
+        if not self.uart.wait_for_ready(timeout=timeout):
+            raise RuntimeError("Timeout waiting for READY marker from SoC")
+        return self.uart.wait_for_bytes(num_bytes=num_bytes, timeout=timeout)
+
+    def _read_latency_and_response(self, timeout: float) -> tuple[int | None, bytes]:
+        """
+        New protocol:
+          1) READY + latency record (8 bytes: cycles, big-endian)
+          2) READY + TPM response (header+body)
+        Returns (latency_cycles, response_bytes).
+        """
+        # 1) Latency record
+        lat_raw = self._read_ready_and_bytes(TPM_LATENCY_RECORD_LEN, timeout)
+        if len(lat_raw) != TPM_LATENCY_RECORD_LEN:
+            raise RuntimeError(
+                f"Incomplete latency record ({len(lat_raw)} bytes, expected {TPM_LATENCY_RECORD_LEN})"
+            )
+        lat_cycles = int.from_bytes(lat_raw, byteorder="big", signed=False)
+
+        # 2) TPM response: first 10-byte header to know the full size
+        header = self._read_ready_and_bytes(10, timeout)
+        if len(header) != 10:
+            raise RuntimeError("Short TPM response header")
+        response_size = int.from_bytes(header[2:6], byteorder="big")
+        if response_size < 10:
+            raise RuntimeError(f"Invalid TPM response size {response_size}")
+        body = self.uart.wait_for_bytes(
+            num_bytes=(response_size - 10), timeout=timeout
+        )
+        if len(body) != (response_size - 10):
+            raise RuntimeError("Short TPM response body")
+        return lat_cycles, header + body
+
+    # ---- Existing API, now latency aware ----
     def wait_for_ready_signal(self):
         while not self.uart.wait_for_ready(timeout=180):
             pass
 
-    def read_tpm_response(self, timeout):
+    def read_tpm_response(self, timeout, *, expect_latency: bool | None = None):
+        """
+        Read a full TPM response. When latency_metrics is enabled (or expect_latency
+        is True), it first reads a latency record, then the TPM response.
+        Returns `bytes` (response). If latency is present, it's logged to stdout.
+        """
+        if expect_latency is None:
+            expect_latency = self.latency_metrics
+
+        if expect_latency:
+            lat_cycles, rsp = self._read_latency_and_response(timeout)
+            print(f"TPM command latency: {lat_cycles} cycles")
+            return rsp
+
+        # Legacy behavior: just header+body after a single READY
         header = self.uart.wait_for_bytes(num_bytes=10, timeout=timeout)
         response_size = int.from_bytes(header[2:6], byteorder="big")
-        body = self.uart.wait_for_bytes(num_bytes=(response_size - 10), timeout=timeout)
+        body = self.uart.wait_for_bytes(
+            num_bytes=(response_size - 10), timeout=timeout
+        )
         return header + body
 
     def extract_first_handle_from_response(self, rsp: bytes) -> int:
@@ -73,7 +131,7 @@ class TpmTester:
         self.uart.send_bytes(bytestream)
 
         print("Waiting for startup answer...")
-        self.wait_for_ready_signal()
+        # In latency mode, read_tpm_response() will consume both latency+response.
         result = self.read_tpm_response(timeout=3600)
 
         if not result:
@@ -642,6 +700,11 @@ def parse_args():
         default="uart-log",
         help="Base filename for UART logs (timestamp and .log will be appended).",
     )
+    parser.add_argument(
+        "--latency-metrics",
+        action="store_true",
+        help="Expect two READYs per TPM command (latency record + response) and log per-command latency.",
+    )
     return parser.parse_args()
 
 
@@ -681,7 +744,8 @@ def main():
                 log_path=log_path,
             )
 
-        tester = TpmTester(uart=uart)
+        # Pass latency_metrics flag into TpmTester
+        tester = TpmTester(uart=uart, latency_metrics=getattr(args, "latency_metrics", False))
         if args.interactive:
             success = tester.repl()
         else:

@@ -12,6 +12,9 @@
 #define TPM_HEADER_LEN 10u    // 2(tag) + 4(size) + 4(code)
 #define TPM_MAX_CMD_LEN 4096u // tune to your worst-case; spec allows large buffers
 
+// Send a latency record: 8-byte big-endian cycle count.
+#define TPM_LATENCY_RECORD_LEN 8u
+
 // NOTE: this should be 64 bit aligned
 extern uint8_t tpm_cmd_buf[TPM_MAX_CMD_LEN];
 
@@ -43,5 +46,6 @@ bool transport_ingestion_done(void);
 uint32_t transport_read_command(void);
 void transport_write_byte(uint8_t b);
 void transport_write_rsp(const uint8_t *buf, uint32_t len);
-void _debug_transport_write_ready(void);
+void transport_write_ready(void);
+void transport_write_latency_record(uint64_t cycles);
 void debug_breakpoint(uint8_t b);

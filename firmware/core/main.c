@@ -10,7 +10,7 @@ int main(void)
 
     // Boot platform
     platform_cold_boot();
-    _debug_transport_write_ready();
+    transport_write_ready();
 
     for (;;)
     {
@@ -24,12 +24,26 @@ int main(void)
                 uint32_t resp_len = (uint32_t)sizeof(tpm_cmd_buf);
                 uint8_t *resp_ptr = tpm_cmd_buf;
 
-                // Optionally pause RX/IRQs so the ingress path can't stomp the buffer
-                // receiver_pause();
+                #ifdef INCLUDE_LATENCY_MEASURES
+                // Measure cycles before/after TPM command
+                uint64_t start_cycles = 0;
+                uint64_t end_cycles = 0;
+                asm volatile("rdcycle %0" : "=r"(start_cycles));
+                #endif
+
                 _plat__RunCommand(cmd_len, tpm_cmd_buf, &resp_len, &resp_ptr);
-                _debug_transport_write_ready();
+
+                #ifdef INCLUDE_LATENCY_MEASURES
+                // Send latency info
+                asm volatile("rdcycle %0" : "=r"(end_cycles));
+                uint64_t delta_cycles = (end_cycles >= start_cycles) ? (end_cycles - start_cycles) : 0;
+                transport_write_ready();
+                transport_write_latency_record(delta_cycles);
+                #endif
+                
+                // Send response
+                transport_write_ready();
                 transport_write_rsp(resp_ptr, resp_len);
-                // receiver_resume();
             }
             else
             {

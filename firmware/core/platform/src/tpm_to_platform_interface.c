@@ -575,8 +575,7 @@ uint32_t _plat__Dilithium_KeyGen(uint8_t sec_level,
     uint32_t rc = dilithium_keygen(sec_level, seed, pk, pk_size, sk, sk_size);
 
     // wipe seed
-    for (size_t i = 0; i < sizeof(seed); i++)
-        ((volatile uint8_t *)seed)[i] = 0;
+    memset(seed, 0, sizeof seed);
 
     return rc;
 }

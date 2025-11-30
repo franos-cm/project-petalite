@@ -17,14 +17,25 @@ from tpm_utils import (
     build_dilithium_signature_param as _build_dilithium_signature_param,
 )
 
+# Latency protocol constants (mirror firmware)
+TPM_LATENCY_RECORD_LEN = 8  # 8-byte big-endian cycle count
+
 
 class TPMClient:
     """Minimal TPM client for Dilithium demo; uses UARTConnection directly."""
 
-    def __init__(self, uart: UARTConnection, on_command=None, on_response=None):
+    def __init__(
+        self,
+        uart: UARTConnection,
+        on_command=None,
+        on_response=None,
+        latency_metrics: bool = False,  # default OFF, match tpm.py
+    ):
         self.uart = uart
         self._on_command = on_command
         self._on_response = on_response
+        # When False, fall back to legacy "no-latency" behavior
+        self.latency_metrics = bool(latency_metrics)
 
     # ---- internal helpers ----
     def _emit_command(self, name: str, data: bytes, meta: dict | None = None):
@@ -45,10 +56,61 @@ class TPMClient:
         while not self.uart.wait_for_ready(timeout=180):
             pass
 
-    def read_tpm_response(self, timeout):
-        header = self.uart.wait_for_bytes(num_bytes=10, timeout=timeout)
+    def _read_ready_and_bytes(self, num_bytes: int, timeout: float) -> bytes:
+        """Wait for a READY marker, then read num_bytes."""
+        if not self.uart.wait_for_ready(timeout=timeout):
+            raise RuntimeError("Timeout waiting for READY marker from SoC")
+        return self.uart.wait_for_bytes(num_bytes=num_bytes, timeout=timeout)
+
+    def _read_latency_and_response(self, timeout: float) -> tuple[int, bytes]:
+        """
+        Firmware protocol:
+          1) READY + latency record (8 bytes, big-endian cycles)
+          2) READY + TPM response (header+body)
+        Returns (latency_cycles, response_bytes).
+        """
+        # 1) Latency record
+        lat_raw = self._read_ready_and_bytes(TPM_LATENCY_RECORD_LEN, timeout)
+        if len(lat_raw) != TPM_LATENCY_RECORD_LEN:
+            raise RuntimeError(
+                f"Incomplete latency record ({len(lat_raw)} bytes, expected {TPM_LATENCY_RECORD_LEN})"
+            )
+        # Entire 8 bytes are the cycle count
+        lat_cycles = int.from_bytes(lat_raw, byteorder="big", signed=False)
+
+        # 2) TPM response: header then body
+        header = self._read_ready_and_bytes(10, timeout)
+        if len(header) != 10:
+            raise RuntimeError("Short TPM response header")
         response_size = int.from_bytes(header[2:6], byteorder="big")
+        if response_size < 10:
+            raise RuntimeError(f"Invalid TPM response size {response_size}")
         body = self.uart.wait_for_bytes(num_bytes=(response_size - 10), timeout=timeout)
+        if len(body) != (response_size - 10):
+            raise RuntimeError("Short TPM response body")
+        return lat_cycles, header + body
+
+    def read_tpm_response(self, timeout):
+        """
+        Read TPM response.
+        If latency_metrics is True:
+          READY + latency record, READY + response.
+        Else:
+          just header+body (legacy behavior).
+        """
+        if self.latency_metrics:
+            lat_cycles, rsp = self._read_latency_and_response(timeout)
+            print(f"TPM command latency: {lat_cycles} cycles")
+            return rsp
+
+        # Legacy: no READY / latency parsing here
+        header = self.uart.wait_for_bytes(num_bytes=10, timeout=timeout)
+        if not header or len(header) < 10:
+            raise RuntimeError("Short TPM response header")
+        response_size = int.from_bytes(header[2:6], "big")
+        body = self.uart.wait_for_bytes(num_bytes=(response_size - 10), timeout=timeout)
+        if not body or len(body) < (response_size - 10):
+            raise RuntimeError("Short TPM response body")
         return header + body
 
     def extract_first_handle_from_response(self, rsp: bytes) -> int:
@@ -74,7 +136,7 @@ class TPMClient:
         self._emit_command("Startup", bytestream, {"handles_out": 0})
         self.uart.send_bytes(bytestream)
         print("Waiting for Startup answer...")
-        self.wait_for_ready_signal()
+        # NOTE: if latency_metrics=False and you are on new firmware, this will desync.
         result = self.read_tpm_response(timeout=3600)
         if not result:
             raise RuntimeError("Failed to get startup answer, aborting")
@@ -90,7 +152,6 @@ class TPMClient:
         self._emit_command("GetRandom", bytestream, {"handles_out": 0})
         self.uart.send_bytes(bytestream)
         print("Waiting for get_random answer...")
-        self.wait_for_ready_signal()
         result = self.read_tpm_response(timeout=3600)
         if not result:
             raise RuntimeError("Failed to get get_random_bytes() answer, aborting")
@@ -109,7 +170,6 @@ class TPMClient:
         self._emit_command("CreatePrimary(Dilithium)", bytestream, {"handles_out": 1})
         self.uart.send_bytes(bytestream)
         print("Waiting for create_primary_dilithium() answer...")
-        self.wait_for_ready_signal()
         result = self.read_tpm_response(timeout=3600)
         if not result:
             raise RuntimeError("Failed to get create_primary_dilithium() answer, aborting")
@@ -132,7 +192,6 @@ class TPMClient:
         self._emit_command("HashSignStart", bytestream, {"handles_out": 1})
         self.uart.send_bytes(bytestream)
         print("Waiting for HashSignStart answer...")
-        self.wait_for_ready_signal()
         result = self.read_tpm_response(timeout=3600)
         if not result:
             raise RuntimeError("Failed to get HashSignStart() answer, aborting")
@@ -159,7 +218,6 @@ class TPMClient:
         self._emit_command("SequenceUpdate", bytestream, {"handles_out": 0})
         self.uart.send_bytes(bytestream)
         print("Waiting for SequenceUpdate answer...")
-        self.wait_for_ready_signal()
         result = self.read_tpm_response(timeout=3600)
         if not result:
             raise RuntimeError("Failed to get SequenceUpdate() answer, aborting")
@@ -183,7 +241,6 @@ class TPMClient:
         self._emit_command("HashSignFinish", bytestream, {"handles_out": 0})
         self.uart.send_bytes(bytestream)
         print("Waiting for HashSignFinish response...")
-        self.wait_for_ready_signal()
         result = self.read_tpm_response(timeout=3600)
         if not result:
             raise RuntimeError("Failed to get HashSignFinish() answer, aborting")
@@ -213,7 +270,6 @@ class TPMClient:
         self._emit_command("HashVerifyStart", bytestream, {"handles_out": 1})
         self.uart.send_bytes(bytestream)
         print("Waiting for HashVerifyStart answer...")
-        self.wait_for_ready_signal()
         rsp = self.read_tpm_response(timeout=3600)
         if not rsp:
             raise RuntimeError("Failed to get HashVerifyStart() answer, aborting")
@@ -239,7 +295,6 @@ class TPMClient:
         self._emit_command("HashVerifyFinish", bytestream, {"handles_out": 0})
         self.uart.send_bytes(bytestream)
         print("Waiting for HashVerifyFinish response...")
-        self.wait_for_ready_signal()
         rsp = self.read_tpm_response(timeout=3600)
         if not rsp:
             raise RuntimeError("Failed to get HashVerifyFinish() answer, aborting")
