@@ -103,7 +103,7 @@ python test/tpm.py --interactive --log
 
 
 ./scripts/build.sh --board
-./scripts/build.sh --force-all --board
+./scripts/build.sh --force-all --board --no-hw-accel
 ./soc/main.py --build-dir=builds/soc --compile-gateware --firmware=builds/firmware.bin &> synth-log.txt
 python test/tpm.py --serial --interactive --log
 

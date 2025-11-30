@@ -10,6 +10,8 @@
 #include "log.h"
 
 #ifndef DILITHIUM_HW_ACCELERATOR
+#include "dilithium_ref.h"   // for dilithium_sw_msg_len/cache
+
 // Shim for dilithium-ref randombytes requirement
 void randombytes(uint8_t *out, size_t outlen) {
     _plat__GetEntropy(out, (uint32_t)outlen);
@@ -520,14 +522,6 @@ LIB_EXPORT uint32_t _plat__GetTpmType()
 // TODO: we shouldnt need this if our DMA could do unaligned accesses.
 // NOTE: its size is currently defined by the max length of a message chunk, considering an 8 kB buffer
 unsigned char dilithium_aligned_buffer[8176] __attribute__((aligned(8)));
-
-#ifndef DILITHIUM_HW_ACCELERATOR
-// Software mode buffers exposed to upper layers
-uint32_t dilithium_sw_msg_len = 0;
-// Max sizes for Dilithium5
-uint8_t  dilithium_sw_pk_cache[2592]; // Sufficient for Dilithium5 PK
-uint8_t  dilithium_sw_sig_cache[4595]; // Sufficient for Dilithium5 Sig
-#endif
 
 // Stream message chunks to hardware
 uint32_t _plat__Dilithium_Update(uint32_t ctx_id,

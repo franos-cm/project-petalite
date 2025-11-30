@@ -4,6 +4,10 @@
 #include <stddef.h>
 #include <stdint.h>
 
+extern UINT32 dilithium_sw_msg_len;
+extern BYTE   dilithium_sw_pk_cache[DILITHIUM_MAX_PUBLIC_KEY];
+extern BYTE   dilithium_sw_sig_cache[DILITHIUM_MAX_SIGNATURE];
+
 #define pqcrystals_dilithium2_PUBLICKEYBYTES 1312
 #define pqcrystals_dilithium2_SECRETKEYBYTES 2560
 #define pqcrystals_dilithium2_BYTES 2420
