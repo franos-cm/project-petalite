@@ -29,7 +29,7 @@ This project can be run either as a software simulation or as a synthesised desi
 
     ```
     mkdir tools && cd tools
-    wget https://raw.githubusercontent.com/enjoy-digital/litex/master/litex_setup.py
+    wget https://raw.githubusercontent.com/franos-cm/litex/project-petalite/litex_setup.py
     chmod +x litex_setup.py && python ./litex_setup.py --init --install --gcc=riscv --config=standard
     pip install git+https://github.com/litex-hub/pythondata-cpu-rocket.git
     ```

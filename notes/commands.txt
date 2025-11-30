@@ -9,7 +9,7 @@ python3 -m venv .venv
 source .venv/bin/activate
 mkdir litex
 cd litex
-wget https://raw.githubusercontent.com/enjoy-digital/litex/master/litex_setup.py
+wget https://raw.githubusercontent.com/franos-cm/litex/project-petalite/litex_setup.py
 chmod +x litex_setup.py
 python3 ./litex_setup.py --init --install --config=full
 
@@ -110,8 +110,11 @@ python test/tpm.py --serial --interactive --log
 BOARD IS xc7vx690tffg1761-3
 
 # In tcp connection
-ssh user@100.100.128.87
-scp builds/soc/gateware/digilent_netfpga_sume.bit user@100.100.128.87:~/franos-cm/bitstreams/digilent-netfpga-sume-v3.bit
+ssh -X user@100.100.128.96
+source .venv/bin/activate
+python test/dashboard.py
+
+scp builds/soc/gateware/digilent_netfpga_sume.bit user@100.100.128.60:~/franos-cm/bitstreams/digilent-netfpga-sume-hw-latency.bit
 
 export PATH=$HOME/franos-cm/python3.12/bin:$PATH
 source .venv/bin/activate
