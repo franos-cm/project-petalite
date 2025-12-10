@@ -192,7 +192,6 @@ class TpmTester:
             "00 10"  # parameters.symmetric.algorithm = TPM_ALG_NULL
             "00 10"  # parameters.scheme.scheme = TPM_ALG_NULL
             "02"  # securityLevel = 2
-            "00 0B"  # nameHashAlg = TPM_ALG_SHA256
             # ----- unique -----
             "00 00"  # unique (TPM2B) size = 0
             # ===== outsideInfo =====
