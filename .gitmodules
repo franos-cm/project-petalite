@@ -4,7 +4,7 @@
 [submodule "dilithium-rtl"]
 	path = soc/cores/dilithium-rtl
 	url = https://github.com/franos-cm/dilithium-rtl.git
-	branch = petalite-compat
+	branch = main
 [submodule "firmware/pq-tpm"]
 	path = firmware/pq-tpm
 	url = https://github.com/franos-cm/pq-tpm.git
